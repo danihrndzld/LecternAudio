@@ -15,12 +15,16 @@ The main features are listed below.
   - Sign in to Audible and sync the list of books in your account, including books you haven't downloaded yet.
 - Listening
   - Play M4B and MP3 files with chapters, playback speed, and saved positions.
-  - Control playback from the menu bar, the keyboard, and the macOS Now Playing widget.
+  - Control playback from the Player menu, the keyboard, and the macOS Now Playing widget. The Player menu has shortcuts for skipping, chapters, and volume.
 - Files
   - Download books from your account and convert them to M4B.
   - Export a book to MP3, as one file or as one file per chapter, with ID3 tags, chapters, and cover art.
+  - Import your own M4B and MP3 files, and join several audio files into one M4B.
+  - Export the library list to Excel, CSV, or JSON, and export a poster of the covers as a PNG image.
 - Settings
   - Choose the output format, the MP3 bitrate, automatic sync, appearance, table font size, and external apps.
+
+The Help menu can check GitHub for new releases, open a bug report with your app and macOS versions filled in, and show a diagnostics window with library counts that you can copy.
 
 ## Requirements
 
