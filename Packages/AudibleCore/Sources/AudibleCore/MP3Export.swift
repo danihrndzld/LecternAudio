@@ -74,7 +74,8 @@ public enum MP3Export {
         }
 
         guard options.splitChapters, !tag.chapters.isEmpty else {
-            return try encode(nil, tag, to: destination, progress: progress)
+            let file = destination.pathExtension.isEmpty ? destination.appendingPathExtension("mp3") : destination
+            return try encode(nil, tag, to: file, progress: progress)
         }
         let created = !FileManager.default.fileExists(atPath: destination.path)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
