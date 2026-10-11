@@ -1,0 +1,45 @@
+{
+  "items": [
+    {
+      "asin": "B0BXXXX001",
+      "sku_lite": "BK_TEST_000001",
+      "title": "Sapiens &amp; Friends",
+      "subtitle": "A Test Subtitle",
+      "authors": [{"asin": "B000AP0001", "name": "Yuval Noah Harari"}, {"name": "Second Author"}],
+      "narrators": [{"name": "Derek Perkins"}],
+      "publisher_name": "Test Publisher",
+      "publisher_summary": "<p>A <b>summary</b>.</p>",
+      "merchandising_summary": "<p>Short.</p>",
+      "runtime_length_min": 710,
+      "release_date": "2018-09-04",
+      "purchase_date": "2023-08-13T18:22:41.000Z",
+      "language": "english",
+      "format_type": "unabridged",
+      "category_ladders": [
+        {"ladder": [{"id": "1", "name": "History"}, {"id": "2", "name": "World"}], "root": "Genres"},
+        {"ladder": [{"id": "3", "name": "Politics & Social Sciences"}], "root": "Genres"}
+      ],
+      "rating": {"overall_distribution": {"average_rating": 4.7, "num_ratings": 12345, "display_stars": 4.5}},
+      "product_images": {"500": "https://m.media-amazon.com/images/I/test1._SL500_.jpg"},
+      "is_finished": false,
+      "percent_complete": 42.5,
+      "is_ayce": false,
+      "pdf_url": null,
+      "customer_rights": {"is_consumable": true}
+    },
+    {
+      "asin": "B0BXXXX002",
+      "title": "Finished Book",
+      "authors": [{"name": "Robert Greene"}],
+      "narrators": [],
+      "runtime_length_min": 60,
+      "release_date": "2015-01-01",
+      "purchase_date": "2024-01-03T09:00:00.000Z",
+      "category_ladders": [],
+      "product_images": {},
+      "is_finished": true,
+      "percent_complete": 100
+    }
+  ],
+  "response_groups": ["always-returned", "product_attrs"]
+}

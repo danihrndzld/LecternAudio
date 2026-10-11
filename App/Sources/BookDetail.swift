@@ -9,7 +9,7 @@ struct BookDetail: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Cover(url: model.library?.artURL(for: book)).aspectRatio(1, contentMode: .fit).frame(maxWidth: 260).frame(maxWidth: .infinity)
+                Cover(url: model.artURL(for: book)).aspectRatio(1, contentMode: .fit).frame(maxWidth: 260).frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(book.title).font(.title2.bold()).textSelection(.enabled)
@@ -106,7 +106,7 @@ struct PlayerBar: View {
         @Bindable var player = player
         if let book = player.book {
             HStack(spacing: 16) {
-                Cover(url: model.library?.thumbURL(for: book), thumbnail: true).frame(width: 40, height: 40)
+                Cover(url: model.thumbURL(for: book), thumbnail: true).frame(width: 40, height: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(book.title).font(.callout.weight(.semibold)).lineLimit(1)
                     Text(player.currentChapter?.title ?? book.author).font(.caption).foregroundStyle(.secondary).lineLimit(1)
