@@ -40,12 +40,12 @@ import Testing
     var tag = ID3Tag()
     tag.chapters = [Chapter(title: "One", startMs: 0, lengthMs: 1500), Chapter(title: "Two", startMs: 1500, lengthMs: 70_000)]
     let d = Array(tag.data.dropFirst(10))
-    let ctoc: [UInt8] = Array("CTOC".utf8) + [0, 0, 0, 14, 0, 0] + Array("toc".utf8) + [0, 0x03, 2]
-        + Array("ch0".utf8) + [0] + Array("ch1".utf8) + [0]
+    func b(_ s: String) -> [UInt8] { Array(s.utf8) }
+    let ctoc: [UInt8] = [b("CTOC"), [0, 0, 0, 14, 0, 0], b("toc\0"), [0x03, 2], b("ch0\0"), b("ch1\0")].flatMap { $0 }
     #expect(Array(d.prefix(ctoc.count)) == ctoc)
-    let tit2: [UInt8] = Array("TIT2".utf8) + [0, 0, 0, 4, 0, 0, 3] + Array("Two".utf8)
-    let chap: [UInt8] = Array("CHAP".utf8) + [0, 0, 0, 34, 0, 0] + Array("ch1".utf8) + [0]
-        + [0, 0, 0x05, 0xDC] + [0, 0x01, 0x17, 0x4C] + Array(repeating: 0xFF, count: 8) + tit2
+    let tit2: [UInt8] = [b("TIT2"), [0, 0, 0, 4, 0, 0, 3], b("Two")].flatMap { $0 }
+    let times: [UInt8] = [0, 0, 0x05, 0xDC, 0, 0x01, 0x17, 0x4C]  // 1500 ms, 71500 ms
+    let chap: [UInt8] = [b("CHAP"), [0, 0, 0, 34, 0, 0], b("ch1\0"), times, [UInt8](repeating: 0xFF, count: 8), tit2].flatMap { $0 }
     #expect(Array(d.suffix(chap.count)) == chap)
 }
 
