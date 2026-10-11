@@ -1,6 +1,7 @@
+import AppKit
 import AudibleCore
-import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 enum LibraryFilter: Hashable {
     case all, downloaded, notConverted, audibleOnly, reading, finished, pdfs
@@ -41,6 +42,9 @@ final class LibraryModel {
     var search = ""
     var selection: Set<Book.ID> = []
     var isPickingFolder = false
+    /// Progress (0...1) of running MP3 exports.
+    private(set) var exports: [Book.ID: Double] = [:]
+    @ObservationIgnored private var exportTasks: [Book.ID: Task<Void, Never>] = [:]
 
     private static let bookmarkKey = "libraryBookmark"
 
@@ -90,6 +94,62 @@ final class LibraryModel {
     func reload() {
         if let root = library?.root { open(root) }
     }
+
+    func m4bURL(for book: Book) -> URL? {
+        book.files.first { $0.type == .m4b }.flatMap { library?.url(for: $0) }
+    }
+
+    /// Asks where to save, then converts the book's M4B to MP3 (64 kbps CBR mono) in the background.
+    func exportMP3(_ book: Book, byChapter: Bool) {
+        guard let source = m4bURL(for: book), let library, exportTasks[book.id] == nil else { return }
+        let name = book.title.replacing(/[\/:]/, with: "-")
+        let destination: URL
+        if byChapter {
+            let panel = NSOpenPanel()
+            panel.canChooseFiles = false
+            panel.canChooseDirectories = true
+            panel.canCreateDirectories = true
+            panel.prompt = "Export"
+            panel.message = "A folder named “\(name)” with one MP3 per chapter is created here."
+            guard panel.runModal() == .OK, let dir = panel.url else { return }
+            destination = dir.appendingPathComponent(name)
+        } else {
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [.mp3]
+            panel.nameFieldStringValue = name + ".mp3"
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            destination = url
+        }
+
+        var tag = ID3Tag()
+        tag.title = book.title
+        tag.album = book.title
+        tag.artist = book.author
+        tag.composer = book.narratedBy
+        tag.genre = book.primaryGenre
+        tag.year = book.releaseDate.map { String(Calendar.current.component(.year, from: $0)) } ?? ""
+        tag.comment = HTMLText.markdown(book.summary)
+        tag.cover = library.artURL(for: book).flatMap { try? Data(contentsOf: $0) }
+        var options = MP3Export.Options()
+        options.splitChapters = byChapter
+
+        let id = book.id
+        exports[id] = 0
+        exportTasks[id] = Task {
+            do {
+                try await MP3Export.run(source: source, destination: destination, tag: tag, options: options) { p in
+                    Task { @MainActor in if self.exports[id] != nil { self.exports[id] = p } }
+                }
+            } catch is CancellationError {
+            } catch {
+                NSAlert(error: error).runModal()
+            }
+            exports[id] = nil
+            exportTasks[id] = nil
+        }
+    }
+
+    func cancelExport(_ id: Book.ID) { exportTasks[id]?.cancel() }
 
     private func restore() {
         #if DEBUG

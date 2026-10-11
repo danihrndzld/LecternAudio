@@ -23,6 +23,22 @@ struct BookDetail: View {
                     .buttonStyle(.borderedProminent).controlSize(.large)
                 }
 
+                if let progress = model.exports[book.id] {
+                    HStack {
+                        ProgressView("Exporting MP3…", value: progress)
+                        Button("Cancel", systemImage: "xmark.circle.fill") { model.cancelExport(book.id) }
+                            .labelStyle(.iconOnly).buttonStyle(.borderless)
+                    }
+                } else if model.m4bURL(for: book) != nil {
+                    Menu {
+                        Button("One File per Chapter…") { model.exportMP3(book, byChapter: true) }
+                    } label: {
+                        Label("Export MP3…", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
+                    } primaryAction: {
+                        model.exportMP3(book, byChapter: false)
+                    }
+                }
+
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
                     field("Narrator", book.narratedBy)
                     field("Length", book.durationText)

@@ -131,6 +131,12 @@ struct BookActions: View {
             Button("Play", systemImage: "play.fill") { player.play(book, url: url) }
             Button("Show in Finder", systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
+        if model.exports[book.id] != nil {
+            Button("Cancel MP3 Export", systemImage: "xmark.circle") { model.cancelExport(book.id) }
+        } else if model.m4bURL(for: book) != nil {
+            Button("Export MP3…", systemImage: "square.and.arrow.up") { model.exportMP3(book, byChapter: false) }
+            Button("Export MP3 by Chapter…", systemImage: "square.and.arrow.up.on.square") { model.exportMP3(book, byChapter: true) }
+        }
         if let pdf = model.library?.pdfURL(for: book) {
             Button("Open PDF", systemImage: "doc.richtext") { NSWorkspace.shared.open(pdf) }
         }
