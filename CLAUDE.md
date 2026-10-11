@@ -12,7 +12,8 @@ Feature inventory of the old app: `docs/openaudible-spec.md`. Stack decision: `d
 - Swift 6 strict concurrency. No `@unchecked Sendable` or `nonisolated(unsafe)` without a one-line reason.
 - CI cannot log into Audible. Every network or crypto feature ships with offline tests: recorded JSON fixtures in `Tests/.../Fixtures`, known-answer crypto vectors. Fixtures never contain tokens, cookies, activation bytes, customer IDs or download links: redact them.
 - Secrets (tokens, device keys, activation bytes) live in Keychain only. Never log them.
-- Views hosted by AppKit outside the window tree (table cells, context menus, inspector) must not read `@Environment` objects; pass dependencies in (see `BookActions`).
+- Views inside `Table` rows and context menus must not read `@Environment` objects (they crashed: AppKit hosts them outside the window tree); pass dependencies in (see `Cover`, `BookActions`).
+- Never use `NSAttributedString` HTML import; use `HTMLText.markdown`.
 - Derive Audible auth/API/decrypt from open sources: mkb79/audible (MIT), audible-cli, FFmpeg's LGPL `aax` demuxer. Do not copy GPL code (AAXClean, Libation).
 - Keep diffs small; one issue per PR. PR title = Conventional Commit (`feat:`, `fix:`, `chore:`…). It becomes the squash commit.
 
