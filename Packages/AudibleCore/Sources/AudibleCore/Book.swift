@@ -137,3 +137,13 @@ extension Book: Codable {
         return f
     }()
 }
+
+extension Book {
+    /// A book made from a local audio file (File ▸ Import), not from Audible or books.json.
+    public init(key: String, title: String, author: String, narratedBy: String = "", genre: String = "", seconds: Int,
+                imageURL: URL? = nil, chapters: [Chapter] = [], files: [BookFile]) {
+        self.init(asin: "", key: key, title: title, author: author, narratedBy: narratedBy, publisher: "", genre: genre,
+                  summary: "", seconds: seconds, rating: nil, ratingCount: nil, releaseDate: nil, purchaseDate: nil,
+                  region: "", readStatus: nil, imageURL: imageURL, chapters: chapters, files: files)
+    }
+}
