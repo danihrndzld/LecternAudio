@@ -9,8 +9,14 @@ import WebKit
 final class AudibleSession {
     private(set) var account: AudibleAccount?
     var error: String?
+    private var restoring: Task<AudibleAccount, Error>?
 
-    init() { account = Keychain.load().flatMap { try? JSONDecoder().decode(AudibleAccount.self, from: $0) } }
+    init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["EARMARK_SNAPSHOT"] != nil { return }
+        #endif
+        account = Keychain.load().flatMap { try? JSONDecoder().decode(AudibleAccount.self, from: $0) }
+    }
 
     /// Registers the device with the code from Amazon's redirect and stores the credentials.
     func register(_ signIn: SignIn, redirect: URL) async {
@@ -19,7 +25,8 @@ final class AudibleSession {
             return
         }
         do {
-            let (data, _) = try await URLSession.shared.data(for: signIn.registerRequest(code: code))
+            let (data, response) = try await AudibleHTTP.data(for: signIn.registerRequest(code: code))
+            try AudibleContent.checkResponse(response)
             let a = try signIn.account(fromRegisterResponse: data)
             try Keychain.save(JSONEncoder().encode(a))
             account = a
@@ -28,16 +35,71 @@ final class AudibleSession {
         }
     }
 
+    func currentAccount() async throws -> AudibleAccount {
+        if let restoring { return try await restoring.value }
+        let task = Task { try await restoreAccount() }
+        restoring = task
+        defer { restoring = nil }
+        return try await task.value
+    }
+
+    private func restoreAccount() async throws -> AudibleAccount {
+        guard var current = account else { throw AudibleError("Sign in to Audible first.") }
+        let identity = current.storageID
+        let serial = current.deviceSerial
+        var changed = false
+        if current.isExpired {
+            let (data, response) = try await AudibleHTTP.data(for: current.refreshRequest())
+            try AudibleContent.checkResponse(response)
+            try current.applyRefresh(data)
+            changed = true
+        }
+        if current.customerID == nil {
+            let (data, response) = try await AudibleHTTP.data(for: current.profileRequest())
+            try AudibleContent.checkResponse(response)
+            try current.applyProfile(data)
+            changed = true
+        }
+        if current.websiteCookies?.isEmpty != false {
+            let (data, response) = try await AudibleHTTP.data(for: current.cookiesRequest())
+            try AudibleContent.checkResponse(response)
+            try current.applyCookies(data)
+            changed = true
+        }
+        try Task.checkCancellation()
+        guard account?.storageID == identity, account?.deviceSerial == serial else { throw CancellationError() }
+        if changed {
+            try Keychain.save(JSONEncoder().encode(current))
+            account = current
+        }
+        return current
+    }
+
+    func activation() async throws -> ActivationBytes {
+        var current = try await currentAccount()
+        if let stored = current.activationData { return try ActivationBytes(stored) }
+        let (data, response) = try await AudibleHTTP.data(for: AudibleContent.activationRequest(account: current))
+        try AudibleContent.checkResponse(response)
+        let activation = try AudibleContent.activation(from: data)
+        guard account?.storageID == current.storageID else { throw CancellationError() }
+        current.activationData = activation.keychainValue
+        try Keychain.save(JSONEncoder().encode(current))
+        account = current
+        return activation
+    }
+
     /// Deregisters the device (best effort, so offline or revoked sessions can still sign out) and deletes the Keychain item.
     func signOut() async {
-        if var a = account {
-            if a.isExpired, let (data, _) = try? await URLSession.shared.data(for: a.refreshRequest()) {
-                try? a.applyRefresh(data)
-            }
-            _ = try? await URLSession.shared.data(for: a.deregisterRequest())
-        }
+        let previous = account
+        restoring?.cancel()
         Keychain.delete()
         account = nil
+        if var a = previous {
+            if a.isExpired, let (data, _) = try? await AudibleHTTP.data(for: a.refreshRequest()) {
+                try? a.applyRefresh(data)
+            }
+            _ = try? await AudibleHTTP.data(for: a.deregisterRequest())
+        }
     }
 }
 
@@ -56,9 +118,12 @@ private enum Keychain {
     }
 
     static func save(_ data: Data) throws {
-        delete()
+        let updated = SecItemUpdate(base as CFDictionary, [kSecValueData: data] as CFDictionary)
+        if updated == errSecSuccess { return }
+        guard updated == errSecItemNotFound else { throw AudibleError("Could not update the Keychain (\(updated)).") }
         var q = base
         q[kSecValueData] = data
+        q[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         let status = SecItemAdd(q as CFDictionary, nil)
         guard status == errSecSuccess else { throw AudibleError("Could not save to the Keychain (\(status)).") }
     }
@@ -158,6 +223,9 @@ struct AccountSettings: View {
                 LabeledContent("Account", value: a.customerName.isEmpty ? "Signed in" : a.customerName)
                 LabeledContent("Marketplace", value: "\(a.marketplace.name) (audible.\(a.marketplace.domain))")
                 LabeledContent("Device", value: a.deviceName)
+                LabeledContent("Session", value: "Saved securely in Keychain")
+                LabeledContent("Website cookies", value: a.websiteCookies == nil ? "Not restored yet" : "Saved securely in Keychain")
+                if let error = session.error { Text(error).foregroundStyle(.red).font(.callout) }
                 Button("Sign Out") {
                     signingOut = true
                     Task { await session.signOut(); signingOut = false }

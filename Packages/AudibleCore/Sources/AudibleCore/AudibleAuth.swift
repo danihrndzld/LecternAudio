@@ -151,7 +151,7 @@ public struct SignIn: Sendable {
                 }
                 struct Extensions: Decodable {
                     struct Device: Decodable { var device_name: String? }
-                    struct Customer: Decodable { var name: String?; var given_name: String? }
+                    struct Customer: Decodable { var name: String?; var given_name: String?; var user_id: String? }
                     var device_info: Device?
                     var customer_info: Customer?
                 }
@@ -169,6 +169,10 @@ public struct SignIn: Sendable {
         guard let s = response.success else {
             throw AudibleError("Device registration failed: \(response.error?.message ?? response.error?.code ?? "unknown error")")
         }
+        let raw = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        let rawResponse = raw?["response"] as? [String: Any]
+        let success = rawResponse?["success"] as? [String: Any]
+        let tokens = success?["tokens"] as? [String: Any]
         return AudibleAccount(
             marketplace: marketplace,
             deviceSerial: serial,
@@ -178,12 +182,14 @@ public struct SignIn: Sendable {
             devicePrivateKey: s.tokens.mac_dms.device_private_key,
             accessToken: s.tokens.bearer.access_token,
             refreshToken: s.tokens.bearer.refresh_token,
-            expires: now.addingTimeInterval(Double(s.tokens.bearer.expires_in) ?? 0))
+            expires: now.addingTimeInterval(Double(s.tokens.bearer.expires_in) ?? 0),
+            customerID: s.extensions?.customer_info?.user_id,
+            websiteCookies: AudibleAccount.normalizedCookies(tokens?["website_cookies"]))
     }
 }
 
 /// A registered device. Stored as JSON in the Keychain; never log it.
-public struct AudibleAccount: Codable, Sendable {
+public struct AudibleAccount: Codable, Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public var marketplace: Marketplace
     public var deviceSerial: String
     public var deviceName: String
@@ -193,8 +199,69 @@ public struct AudibleAccount: Codable, Sendable {
     public var accessToken: String
     public var refreshToken: String
     public var expires: Date
+    public var customerID: String? = nil
+    public var websiteCookies: [[String: String]]? = nil
+    public var activationData: String? = nil
+    public var description: String { "<Audible account>" }
+    public var debugDescription: String { description }
+
+    public var storageID: String {
+        SHA256.hash(data: Data("\(marketplace.code):\(customerID ?? deviceSerial)".utf8))
+            .map { String(format: "%02x", $0) }.joined()
+    }
 
     public var isExpired: Bool { expires < .now.addingTimeInterval(60) }
+
+    public func profileRequest() -> URLRequest {
+        var request = URLRequest(url: marketplace.amazonAPI.appendingPathComponent("user/profile"))
+        request.setValue(accessToken, forHTTPHeaderField: "x-amz-access-token")
+        return request
+    }
+
+    public mutating func applyProfile(_ data: Data) throws {
+        struct Profile: Decodable { var user_id: String }
+        guard let profile = try? JSONDecoder().decode(Profile.self, from: data), !profile.user_id.isEmpty else {
+            throw AudibleError("Could not restore the Audible account identity. Sign in again.")
+        }
+        customerID = profile.user_id
+    }
+
+    public func cookiesRequest() -> URLRequest {
+        var components = URLComponents()
+        components.queryItems = [
+            ("app_name", "Audible"), ("app_version", "3.56.2"), ("source_token", refreshToken),
+            ("requested_token_type", "auth_cookies"), ("source_token_type", "refresh_token"),
+            ("domain", ".amazon.\(marketplace.domain)")
+        ].map { URLQueryItem(name: $0, value: $1) }
+        var request = URLRequest(url: URL(string: "https://www.amazon.\(marketplace.domain)/ap/exchangetoken/cookies")!)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data((components.percentEncodedQuery ?? "").replacingOccurrences(of: "+", with: "%2B").utf8)
+        return request
+    }
+
+    public mutating func applyCookies(_ data: Data) throws {
+        guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let response = envelope["response"] as? [String: Any], let tokens = response["tokens"] as? [String: Any],
+              let domains = tokens["cookies"] as? [String: Any], !domains.isEmpty else {
+            throw AudibleError("Could not restore the Amazon session cookies. Sign in again.")
+        }
+        let cookies = domains.values.flatMap { Self.normalizedCookies($0) ?? [] }
+        guard !cookies.isEmpty else { throw AudibleError("Amazon returned no session cookies. Sign in again.") }
+        websiteCookies = cookies
+    }
+
+    static func normalizedCookies(_ raw: Any?) -> [[String: String]]? {
+        guard let raw = raw as? [[String: Any]] else { return nil }
+        return raw.compactMap { cookie in
+            guard cookie["Name"] is String, cookie["Value"] is String else { return nil }
+            return cookie.compactMapValues { value in
+                if let string = value as? String { return string }
+                if let number = value as? NSNumber { return number.stringValue }
+                return nil
+            }
+        }
+    }
 
     public func refreshRequest() -> URLRequest {
         var c = URLComponents()
@@ -225,7 +292,7 @@ public struct AudibleAccount: Codable, Sendable {
         var r = URLRequest(url: marketplace.amazonAPI.appendingPathComponent("auth/deregister"))
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        r.setValue(accessToken, forHTTPHeaderField: "x-amz-access-token")
         r.httpBody = Data(#"{"deregister_all_existing_accounts":false}"#.utf8)
         return r
     }

@@ -17,9 +17,9 @@ The implementation is independently written against the public [FFmpeg AAX demux
 
 ## Earmark behavior
 
-### Gap: account-driven automation
+### Historical gap: account-driven automation
 
-The current key field and per-book Keychain entry are an Earmark implementation shortcut, not OpenAudible's user flow. This implementation supplies the conversion engine only; it does not yet reproduce signing in, discovering the account's library, downloading and converting automatically.
+The initial key field and per-book Keychain entry were an Earmark implementation shortcut, not OpenAudible's user flow. The account-driven workflow described below now replaces that prompt for signed-in library books; manual keys remain available for standalone local imports.
 
 A follow-up inspection on 2026-10-11 established:
 
@@ -30,19 +30,22 @@ A follow-up inspection on 2026-10-11 established:
 
 For this follow-up, REA's `open_jeb_project` returned `capability_unavailable` because no JEB MCP engine was running. The method observations above come from focused `javap -p -c` / `-v` inspection of the same installed JAR, not successful REA Java decompilation. No account tokens, license codes or content keys were read or sent to a server.
 
-The intended product flow is account sign-in → library sync → authorized download → automatic key resolution → conversion. Account/session management, account-to-book association, secure key acquisition and the download/conversion queue must be implemented before claiming that workflow is complete. The current raw key prompt should not be presented as its finished UX.
+The product flow is account sign-in → library sync → authorized download → automatic key resolution → conversion.
 
-### Pending end-to-end workflow
+### Account-driven workflow
 
-- [ ] Sign in to Amazon/Audible and register the device; keep session tokens and device credentials in Keychain, with renewal and sign-out handling.
-- [ ] Sync the authenticated account's library, associating each book with its owning account and marketplace.
-- [ ] Download authorized content with retry, cancellation and resumable queue state; retain the original source until conversion succeeds.
-- [ ] Resolve legacy AAX activation data automatically through an independently implemented account-authorized path. Validate the MIT reference against the live protocol before relying on it; do not depend on OpenAudible's licensed service.
-- [ ] For AAXC, request the content license and decode its per-content voucher internally; add a separately tested conversion path for its key/IV.
-- [ ] Chain download → credential resolution → conversion → library registration, with recoverable errors and no raw-key prompt in the normal account flow. Keep manual local-file import as an advanced fallback.
-- [ ] Verify account switching, expired sessions, unavailable licenses, incorrect credentials, interrupted downloads, cancellation and safe retry using offline fixtures, then an explicitly authorized live-account smoke test.
+- Sign-in persists the registered device, bearer/refresh tokens, customer identity and registration cookies in Keychain. The browser remains nonpersistent; restoring the app session does not require browser cookies. Older saved sessions obtain missing identity and cookies through Amazon's authenticated profile and cookie-exchange endpoints. Failed restoration preserves the previous Keychain item and asks the user to sign in again.
+- Catalogs, outputs and queue files are isolated under `Application Support/Earmark/accounts/<hashed account and marketplace>/`. Signing out cancels current work and hides that account's catalog; saved audio is retained. Signed API requests use an ephemeral transport that rejects redirects. CDN requests carry no account authentication or cookies.
+- **Download and Convert** requests a signed, granted AAXC license for the selected ASIN, decodes its voucher in memory and runs FFmpeg with `-audible_key` / `-audible_iv`. No raw license or key is written to disk. For locally imported AAX books present in the synced library, the signed activation endpoint supplies account-level activation data cached in Keychain.
+- The serial queue persists metadata and state. Interrupted work requeues on relaunch, while failed/cancelled jobs wait for **Retry**. Downloads use disk-backed HTTP ranges and retain completed chunks; servers that ignore ranges restart the transfer without appending duplicate bytes. Partial files are scoped by a fingerprint of their content credentials. A fresh license is requested on retry/relaunch.
+- Output is validated before registration. Existing output left by an interruption is checked before adoption, never overwritten. Original downloads are kept. Embedded chapters/artwork are retained, with license chapters and the library cover used when available.
+- **Downloads** exposes progress, cancellation, retry and **Download Missing Books**. Automatic downloading after future syncs is opt-in to avoid unexpectedly transferring an entire library. The inspector, context menu and Conversion menu expose per-book/selection actions.
 
-These items are pending, not capabilities included in this commit. AAX activation data belongs to the account; the current per-book Keychain storage is temporary. AAXC vouchers remain content-specific.
+AAX activation data belongs to the account; AAXC vouchers are content-specific. Offline tests cover registration compatibility, cookie/profile restoration, a voucher known-answer vector generated with OpenSSL, signed requests, malformed/denied licenses, range validation, cancellation, restart and queue restoration. Live-account download/conversion has not been exercised in this change; server-side policy or format differences may still require follow-up. A revoked license is reported rather than bypassed. Split-only titles and non-AAC formats are not implemented.
+
+Protocol references: the MIT-licensed [Audible authentication implementation](https://github.com/mkb79/Audible/blob/master/src/audible/auth.py), [activation endpoint](https://github.com/mkb79/Audible/blob/master/src/audible/activation_bytes.py), [voucher decoding](https://github.com/mkb79/Audible/blob/master/src/audible/aescipher.py), [audible-cli license requests](https://github.com/mkb79/audible-cli/blob/master/src/audible_cli/models.py), and [FFmpeg AAXC input options](https://ffmpeg.org/pipermail/ffmpeg-cvslog/2020-November/125026.html). Amazon profile/deregistration calls use `x-amz-access-token`, matching the current reference rather than its legacy bearer-header convention.
+
+Account-workflow verification: 46 core tests passed locally, including the optional public encrypted-AAX conversion and real FFmpeg remux tests. The signed app built successfully; a downloads-sheet snapshot was rendered with synthetic metadata and Keychain loading disabled. These checks do not prove a live AAXC account download, actual token renewal, or interactive Keychain prompts. No user session secret was read by the development tools; only the presence of the Keychain item was checked.
 
 ### Implemented local-file workflow
 
@@ -54,7 +57,7 @@ These items are pending, not capabilities included in this commit. AAX activatio
 6. Output is staged in a unique directory beside the destination. On successful FFmpeg exit, Earmark checks nonempty output and decodes the first second without any key. This is an initial playability check, not a complete decode verification of an entire audiobook. It then moves the result to `books/Earmark/<source name>.m4b`, refusing to replace existing files. The original AAX is kept.
 7. `earmark-conversions.json` maps book IDs to converted file paths. Loading the library merges existing outputs into the book list, enabling playback and MP3 export. OpenAudible's `books.json` is never rewritten. If recording fails, the newly converted output is removed so a retry can proceed.
 
-Only local `.aax` input is supported. AAXC, account registration, activation-key recovery, batch scheduling and automatic downloads are outside this change. Existing output collisions are reported rather than overwritten; rename or move the existing output before retrying.
+The manual local-import path accepts `.aax`; AAXC is handled by the account download workflow. Existing local-import output collisions are reported rather than overwritten; rename or move the existing output before retrying.
 
 ## Verification
 

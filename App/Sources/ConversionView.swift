@@ -10,7 +10,7 @@ struct ConversionView: View {
             Text(conversion.book?.title ?? "").font(.headline)
             Text("Keep the original audio quality, chapters and cover. Your AAX file is kept.")
                 .foregroundStyle(.secondary)
-            if !conversion.isRunning && !conversion.succeeded {
+            if !conversion.isRunning && !conversion.succeeded && !conversion.usesAccountKey {
                 SecureField("Activation bytes (8 hexadecimal characters)", text: $conversion.activationBytes)
                     .textFieldStyle(.roundedBorder)
                 Text("Use the activation bytes for the Audible account that owns this AAX file.")
@@ -35,7 +35,7 @@ struct ConversionView: View {
                 } else {
                     Button(conversion.succeeded ? "Done" : "Close") { conversion.dismiss() }
                         .keyboardShortcut(.cancelAction)
-                    if !conversion.succeeded {
+                    if !conversion.succeeded && !conversion.usesAccountKey {
                         Button("Convert") { conversion.start(libraryModel: library) }
                             .keyboardShortcut(.defaultAction)
                             .disabled(conversion.activationBytes.isEmpty || conversion.ffmpegURL == nil)

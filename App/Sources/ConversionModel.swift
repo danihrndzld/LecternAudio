@@ -14,6 +14,7 @@ final class ConversionModel {
     private(set) var succeeded = false
     private let converter = AAXConverter()
     private var task: Task<Void, Never>?
+    private(set) var usesAccountKey = false
 
     var ffmpegURL: URL? {
         Bundle.main.executableURL?.deletingLastPathComponent().deletingLastPathComponent()
@@ -23,12 +24,41 @@ final class ConversionModel {
     func prepare(_ book: Book) {
         guard !isRunning else { return }
         self.book = book
+        usesAccountKey = false
         activationBytes = ""
         message = nil
         succeeded = false
         progress = 0
         do { activationBytes = try ActivationKeychain.read(account: book.id) ?? "" }
         catch { message = error.localizedDescription }
+    }
+
+    func prepare(_ book: Book, session: AudibleSession, library: LibraryModel) {
+        guard !isRunning else { return }
+        self.book = book
+        activationBytes = ""
+        usesAccountKey = true
+        isRunning = true
+        succeeded = false
+        progress = 0
+        message = "Activating your Audible account…"
+        let identity = session.account?.storageID
+        let root = library.library?.root
+        task = Task {
+            do {
+                let key = try await session.activation()
+                try Task.checkCancellation()
+                guard session.account?.storageID == identity, library.library?.root == root else { throw CancellationError() }
+                activationBytes = key.keychainValue
+                isRunning = false
+                task = nil
+                start(libraryModel: library)
+            } catch {
+                isRunning = false
+                task = nil
+                message = (error as? AudibleError)?.message ?? "Could not activate this account. Sign in again or retry."
+            }
+        }
     }
 
     func start(libraryModel: LibraryModel) {
@@ -41,8 +71,10 @@ final class ConversionModel {
         let key: ActivationBytes
         do {
             key = try ActivationBytes(activationBytes)
-            if rememberKey { try ActivationKeychain.save(activationBytes, account: book.id) }
-            else { try ActivationKeychain.delete(account: book.id) }
+            if !usesAccountKey {
+                if rememberKey { try ActivationKeychain.save(activationBytes, account: book.id) }
+                else { try ActivationKeychain.delete(account: book.id) }
+            }
         } catch {
             message = error.localizedDescription
             return
