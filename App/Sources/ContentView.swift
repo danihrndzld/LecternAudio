@@ -91,20 +91,11 @@ struct ContentView: View {
                 session.error = "Could not restore the session. Open Account Settings to sign in again."
             }
         }
-        .task(id: "\(session.account?.deviceSerial ?? "")|\(autoSync ? autoSyncHours : 0)") {
-            var last = model.lastSync
-            while session.account != nil, let delay = AutoSync.delay(hours: autoSync ? autoSyncHours : 0, last: last) {
-                do { try await Task.sleep(for: .seconds(delay)) } catch { return }
-                last = .now
-                if let account = try? await session.currentAccount() { model.sync(account) }
-            }
-        }
+        .task(id: autoSyncID) { await autoSyncLoop() }
         .onChange(of: model.downloads.activeID) { old, new in
             if showProgress, old == nil, new != nil { showDownloads = true }
         }
-        .onChange(of: appearance, initial: true) { _, new in
-            NSApp.appearance = new == "system" ? nil : NSAppearance(named: new == "dark" ? .darkAqua : .aqua)
-        }
+        .onChange(of: appearance, initial: true) { _, new in applyAppearance(new) }
         .sheet(isPresented: $showDownloads) { DownloadsView(downloads: model.downloads, library: model) }
         .alert("Sync failed", isPresented: Binding { model.syncError != nil } set: { if !$0 { model.syncError = nil } }) {
             Button("OK") {}
@@ -117,6 +108,23 @@ struct ContentView: View {
         .sheet(isPresented: Binding(get: { model.conversion.book != nil }, set: { if !$0 { model.conversion.dismiss() } })) {
             ConversionView(conversion: model.conversion, library: model)
         }
+    }
+
+    private var autoSyncHoursOrOff: Int { autoSync ? autoSyncHours : 0 }
+    private var autoSyncID: String { "\(session.account?.deviceSerial ?? "")|\(autoSyncHoursOrOff)" }
+
+    /// Syncs every N hours while signed in; restarts when the account or interval changes.
+    private func autoSyncLoop() async {
+        var last = model.lastSync
+        while session.account != nil, let delay = AutoSync.delay(hours: autoSyncHoursOrOff, last: last) {
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            last = .now
+            if let account = try? await session.currentAccount() { model.sync(account) }
+        }
+    }
+
+    private func applyAppearance(_ name: String) {
+        NSApp.appearance = name == "system" ? nil : NSAppearance(named: name == "dark" ? .darkAqua : .aqua)
     }
 }
 
