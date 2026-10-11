@@ -2,9 +2,6 @@ import AudibleCore
 import SwiftUI
 
 nonisolated extension Book {
-    var purchaseSort: Date { purchaseDate ?? .distantPast }
-    var releaseSort: Date { releaseDate ?? .distantPast }
-    var ratingSort: Double { rating ?? 0 }
     var durationText: String {
         Duration.seconds(seconds).formatted(.units(allowed: [.hours, .minutes], width: .narrow))
     }
@@ -13,35 +10,43 @@ nonisolated extension Book {
 struct LibraryTable: View {
     @Environment(LibraryModel.self) private var model
     @Environment(Player.self) private var player
-    @State private var sortOrder: [KeyPathComparator<Book>] = [.init(\.purchaseSort, order: .reverse)]
-    @AppStorage(Prefs.tableFontSize) private var fontSize = "medium"
+    @AppStorage(Prefs.tableFontSize) private var fontSize = TableFontSize.medium
+    @FocusState private var focused: Bool
 
     var body: some View {
         @Bindable var model = model
-        Table(model.visibleBooks.sorted(using: sortOrder), selection: $model.selection, sortOrder: $sortOrder) {
-            TableColumn("Title", value: \.title) { b in
+        Table(model.visibleBooks, selection: $model.selection, sortOrder: $model.sortOrder, columnCustomization: $model.columnCustomization) {
+            TableColumn("Title", sortUsing: BookComparator(.title)) { b in
                 HStack(spacing: 8) {
                     Cover(url: model.thumbURL(for: b), thumbnail: true).frame(width: 28, height: 28)
                     Text(b.title).lineLimit(1)
                 }
             }
             .width(min: 200, ideal: 320)
-            TableColumn("Author", value: \.author).width(min: 100, ideal: 160)
-            TableColumn("Narrator", value: \.narratedBy).width(min: 100, ideal: 140)
-            TableColumn("Length", value: \.seconds) { Text($0.durationText).monospacedDigit() }.width(70)
-            TableColumn("Purchased", value: \.purchaseSort) { b in
+            .customizationID(BookColumn.title.rawValue)
+            .disabledCustomizationBehavior(.visibility)
+            TableColumn("Author", sortUsing: BookComparator(.author)) { Text($0.author) }
+                .width(min: 100, ideal: 160).customizationID(BookColumn.author.rawValue)
+            TableColumn("Narrator", sortUsing: BookComparator(.narrator)) { Text($0.narratedBy) }
+                .width(min: 100, ideal: 140).customizationID(BookColumn.narrator.rawValue)
+            TableColumn("Length", sortUsing: BookComparator(.length)) { Text($0.durationText).monospacedDigit() }
+                .width(70).customizationID(BookColumn.length.rawValue)
+            TableColumn("Purchased", sortUsing: BookComparator(.purchased)) { b in
                 Text(b.purchaseDate?.formatted(date: .abbreviated, time: .omitted) ?? "—")
-            }.width(100)
-            TableColumn("Released", value: \.releaseSort) { b in
+            }.width(100).customizationID(BookColumn.purchased.rawValue)
+            TableColumn("Released", sortUsing: BookComparator(.released)) { b in
                 Text(b.releaseDate?.formatted(.dateTime.year()) ?? "—")
-            }.width(60)
-            TableColumn("Rating", value: \.ratingSort) { b in
+            }.width(60).customizationID(BookColumn.released.rawValue)
+            TableColumn("Rating", sortUsing: BookComparator(.rating)) { b in
                 Text(b.rating.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "—").monospacedDigit()
-            }.width(50)
-            TableColumn("Genre", value: \.primaryGenre).width(min: 100, ideal: 150)
-            TableColumn("") { b in StatusBadge(book: b) }.width(24)
+            }.width(50).customizationID(BookColumn.rating.rawValue)
+            TableColumn("Genre", sortUsing: BookComparator(.genre)) { Text($0.primaryGenre) }
+                .width(min: 100, ideal: 150).customizationID(BookColumn.genre.rawValue)
+            TableColumn("") { b in StatusBadge(book: b) }.width(24).customizationID("status")
         }
-        .font(.system(size: ["small": 11, "large": 15][fontSize] ?? 13))
+        .font(fontSize.font)
+        .focused($focused)
+        .onChange(of: model.focusListRequest) { focused = true }
         .contextMenu(forSelectionType: Book.ID.self) { ids in
             if let id = ids.first, let b = model.books.first(where: { $0.id == id }) { BookActions(book: b, model: model, player: player) }
         } primaryAction: { ids in
@@ -61,7 +66,7 @@ struct LibraryGrid: View {
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20)], spacing: 24) {
-                ForEach(model.visibleBooks.sorted { $0.purchaseSort > $1.purchaseSort }) { b in
+                ForEach(model.visibleBooks) { b in
                     VStack(alignment: .leading, spacing: 6) {
                         Cover(url: model.artURL(for: b))
                             .aspectRatio(1, contentMode: .fit)

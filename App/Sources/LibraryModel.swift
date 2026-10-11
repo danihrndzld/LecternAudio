@@ -1,6 +1,7 @@
 import AppKit
 import AudibleCore
 import Observation
+import SwiftUI
 import UniformTypeIdentifiers
 
 enum LibraryFilter: Hashable {
@@ -52,6 +53,21 @@ final class LibraryModel {
     var search = ""
     var selection: Set<Book.ID> = []
     var isPickingFolder = false
+    var sortOrder = BookComparator.defaultOrder
+    var columnCustomization: TableColumnCustomization<Book> = (UserDefaults.standard.data(forKey: "tableColumns"))
+        .flatMap { try? JSONDecoder().decode(TableColumnCustomization<Book>.self, from: $0) } ?? .init() {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(columnCustomization), forKey: "tableColumns") }
+    }
+    var showInspector = true
+    var showChapters = false
+    /// Bumped by View ▸ Focus Book List; the table takes focus when it changes.
+    var focusListRequest = 0
+    /// Books added with File ▸ Import, kept across launches with security-scoped bookmarks.
+    var imported: [Book] = [] { didSet { merge() } }
+    @ObservationIgnored var importedURLs: [Book.ID: URL] = [:]
+    /// Running menu jobs (join, poster, import URL); File ▸ Cancel All Jobs cancels them.
+    private(set) var jobCount = 0
+    @ObservationIgnored var jobs: [UUID: Task<Void, Never>] = [:] { didSet { jobCount = jobs.count } }
     let conversion = ConversionModel()
     let downloads = DownloadModel()
     private var accountRoot: URL?
@@ -69,13 +85,14 @@ final class LibraryModel {
     init() {
         Prefs.register()
         restore()
+        restoreImports()
     }
 
     private var store: URL? { accountRoot?.appendingPathComponent("catalog.json") }
 
     private func merge() {
         let local = AudibleLibrary.merge(audible: library?.books ?? [], local: downloadedLibrary?.books ?? [])
-        books = AudibleLibrary.merge(audible: audibleBooks, local: local)
+        books = AudibleLibrary.merge(audible: audibleBooks, local: local) + imported
     }
 
     /// Signed out, the app shows only the OpenAudible folder, as before sign-in existed.
@@ -113,10 +130,11 @@ final class LibraryModel {
                 try AudibleLibrary.save(fetched, to: store)
                 audibleBooks = fetched
                 lastSync = .now
+                AppLog.shared.info("Synced \(fetched.count) books from Audible")
                 if downloads.automaticallyDownload { downloads.enqueue(books) }
-            } catch is CancellationError {
+            } catch let error where error is CancellationError || Task.isCancelled {
             } catch {
-                if syncGeneration == generation { syncError = error.localizedDescription }
+                if syncGeneration == generation { syncError = error.localizedDescription; AppLog.shared.error("Sync failed: \(error.localizedDescription)") }
             }
             if syncGeneration == generation { isSyncing = false; syncTask = nil }
         }
@@ -133,6 +151,7 @@ final class LibraryModel {
     }
 
     func audioURL(for book: Book) -> URL? {
+        if let url = importedURLs[book.id] { return url }
         if let owned = downloadedLibrary?.books.first(where: { $0.id == book.id }),
            let url = downloadedLibrary?.audioURL(for: owned) { return url }
         return library?.audioURL(for: book)
@@ -174,7 +193,7 @@ final class LibraryModel {
                 || b.title.localizedStandardContains(q)
                 || b.author.localizedStandardContains(q)
                 || b.narratedBy.localizedStandardContains(q))
-        }
+        }.sorted(using: sortOrder)
     }
 
     var genres: [(String, Int)] {
@@ -199,6 +218,7 @@ final class LibraryModel {
             error = nil
             if let data = try? url.bookmarkData(options: .withSecurityScope) {
                 UserDefaults.standard.set(data, forKey: Self.bookmarkKey)
+                recentLibraries = [data] + recentLibraries.filter { Self.resolve($0)?.standardizedFileURL != url.standardizedFileURL }.prefix(4)
             }
         } catch {
             if scoped { url.stopAccessingSecurityScopedResource() }
@@ -210,7 +230,42 @@ final class LibraryModel {
         if let root = library?.root { open(root) }
     }
 
+    /// Controls ▸ Refresh Files: rescans the OpenAudible folder, the account's downloads and imported files.
+    func refreshFiles() {
+        reload()
+        if let accountRoot { downloadedLibrary = try? OpenAudibleLibrary(root: accountRoot) }
+        imported.removeAll { b in importedURLs[b.id].map { !FileManager.default.fileExists(atPath: $0.path) } ?? true }
+        saveImports()
+        merge()
+        AppLog.shared.info("Refreshed files: \(books.count) books")
+    }
+
+    /// Bookmarks of the last five library folders (File ▸ Manage Libraries).
+    var recentLibraries: [Data] = UserDefaults.standard.array(forKey: "recentLibraries") as? [Data] ?? [] {
+        didSet { UserDefaults.standard.set(recentLibraries, forKey: "recentLibraries") }
+    }
+
+    static func resolve(_ bookmark: Data) -> URL? {
+        var stale = false
+        return try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &stale)
+    }
+
+    var isRunningJobs: Bool {
+        isSyncing || conversion.isRunning || downloads.pendingCount > 0 || !exports.isEmpty || jobCount > 0
+    }
+
+    /// Controls ▸ Cancel All Jobs, through each job's own cancel API.
+    func cancelAllJobs() {
+        syncTask?.cancel()
+        conversion.cancel()
+        for job in downloads.jobs where [.queued, .licensing, .downloading, .converting].contains(job.state) { downloads.cancel(job.id) }
+        exportTasks.values.forEach { $0.cancel() }
+        jobs.values.forEach { $0.cancel() }
+        AppLog.shared.info("Cancelled all jobs")
+    }
+
     func m4bURL(for book: Book) -> URL? {
+        if let url = importedURLs[book.id] { return book.files.first?.type == .m4b ? url : nil }
         if let owned = downloadedLibrary?.books.first(where: { $0.id == book.id }),
            let file = owned.files.first(where: { $0.type == .m4b }) { return downloadedLibrary?.url(for: file) }
         return book.files.first { $0.type == .m4b }.flatMap { library?.url(for: $0) }
@@ -288,9 +343,6 @@ final class LibraryModel {
         }
         #endif
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
-        var stale = false
-        if let url = try? URL(resolvingBookmarkData: data, options: .withSecurityScope, bookmarkDataIsStale: &stale) {
-            open(url)
-        }
+        if let url = Self.resolve(data) { open(url) }
     }
 }

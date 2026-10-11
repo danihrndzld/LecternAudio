@@ -71,7 +71,7 @@ struct BookDetail: View {
 
                 if book.chapters.count > 1 {
                     Divider()
-                    DisclosureGroup("\(book.chapters.count) Chapters") {
+                    DisclosureGroup("\(book.chapters.count) Chapters", isExpanded: Bindable(model).showChapters) {
                         ForEach(book.chapters, id: \.startMs) { c in
                             HStack {
                                 Text(c.title).lineLimit(1)

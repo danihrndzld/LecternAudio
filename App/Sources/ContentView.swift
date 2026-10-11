@@ -6,7 +6,6 @@ struct ContentView: View {
     @Environment(AudibleSession.self) private var session
     @Environment(Player.self) private var player
     @AppStorage("viewMode") private var gridMode = false
-    @State private var showInspector = true
     @State private var showDownloads = false
     @State private var launched = false
     @AppStorage(Prefs.refreshOnLaunch) private var refreshOnLaunch = true
@@ -39,7 +38,7 @@ struct ContentView: View {
             .navigationTitle(model.filter.title)
             .navigationSubtitle(model.books.isEmpty ? "" : "\(model.visibleBooks.count) books")
         }
-        .inspector(isPresented: $showInspector) {
+        .inspector(isPresented: $model.showInspector) {
             Group {
                 if let book = model.selectedBook {
                     BookDetail(book: book)
@@ -70,7 +69,7 @@ struct ContentView: View {
                 .disabled(session.account == nil || model.isSyncing)
             }
             ToolbarItem {
-                Button("Info", systemImage: "info.circle") { showInspector.toggle() }
+                Button("Info", systemImage: "info.circle") { model.showInspector.toggle() }
             }
         }
         .onChange(of: session.account?.storageID, initial: true) { _, _ in model.useAudible(session) }
