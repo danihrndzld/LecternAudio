@@ -27,34 +27,7 @@ struct EarmarkApp: App {
                 }
                 #endif
         }
-        .commands {
-            CommandGroup(after: .newItem) {
-                Button("Open OpenAudible Library…") { library.isPickingFolder = true }
-                    .keyboardShortcut("o")
-                Button("Reload Library") { library.reload() }
-                    .keyboardShortcut("r")
-            }
-            AccountCommands()
-            CommandMenu("Playback") {
-                Button(player.isPlaying ? "Pause" : "Play") { player.toggle() }
-                    .keyboardShortcut(.space, modifiers: [])
-                    .disabled(player.book == nil)
-                Button("Back 30 Seconds") { player.skip(-30) }
-                    .keyboardShortcut(.leftArrow, modifiers: .command)
-                Button("Forward 30 Seconds") { player.skip(30) }
-                    .keyboardShortcut(.rightArrow, modifiers: .command)
-            }
-            CommandMenu("Conversion") {
-                Button("Convert Selected Book to M4B…") {
-                    if let book = library.selectedBook { library.convert(book) }
-                }
-                .disabled(library.selectedBook.flatMap { library.library?.aaxURL(for: $0) } == nil || library.conversion.isRunning)
-                Button("Download and Convert Selected Books") {
-                    library.downloads.enqueue(library.books.filter { library.selection.contains($0.id) })
-                }
-                .disabled(!library.books.contains { library.selection.contains($0.id) && library.canDownload($0) })
-            }
-        }
+        .commands { AppCommands(library: library, player: player, session: session) }
 
         Window("Sign In to Audible", id: SignInView.windowID) {
             SignInView().environment(session)
