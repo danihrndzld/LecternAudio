@@ -64,7 +64,7 @@ struct EarmarkApp: App {
         .restorationBehavior(.disabled)
 
         Settings {
-            AccountSettings().environment(session)
+            SettingsView().environment(session)
         }
     }
 }

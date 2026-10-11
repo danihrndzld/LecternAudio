@@ -1,5 +1,5 @@
+import AppKit
 import AudibleCore
-import Foundation
 import Observation
 
 @Observable
@@ -191,6 +191,7 @@ final class DownloadModel {
                     throw error
                 }
                 update(job.id, .complete)
+                Prefs.playCompletionSound()
             } catch {
                 guard generation == token else { return }
                 if Task.isCancelled || error is CancellationError { update(job.id, .cancelled, message: "Cancelled. Retry to resume.") }

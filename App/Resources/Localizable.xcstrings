@@ -1,0 +1,416 @@
+{
+  "sourceLanguage": "en",
+  "version": "1.0",
+  "strings": {
+    "%lld kbps": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld kbps"
+          }
+        }
+      }
+    },
+    "Account": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuenta"
+          }
+        }
+      }
+    },
+    "Advanced": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanzado"
+          }
+        }
+      }
+    },
+    "Appearance": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apariencia"
+          }
+        }
+      }
+    },
+    "Applications": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicaciones"
+          }
+        }
+      }
+    },
+    "Audio Output": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salida de audio"
+          }
+        }
+      }
+    },
+    "Audio player": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproductor de audio"
+          }
+        }
+      }
+    },
+    "Automation": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatización"
+          }
+        }
+      }
+    },
+    "Best quality; recommended if your players support it.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mejor calidad; recomendado si tus reproductores lo admiten."
+          }
+        }
+      }
+    },
+    "Choose…": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir…"
+          }
+        }
+      }
+    },
+    "Concurrent Jobs": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tareas simultáneas"
+          }
+        }
+      }
+    },
+    "Dark": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oscuro"
+          }
+        }
+      }
+    },
+    "Disable update checks": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desactivar la búsqueda de actualizaciones"
+          }
+        }
+      }
+    },
+    "Downloaded books also get an MP3 copy next to the M4B.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los libros descargados también reciben una copia MP3 junto al M4B."
+          }
+        }
+      }
+    },
+    "Earmark has no updater yet; this choice is kept for when it does.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Earmark aún no tiene actualizador; esta opción se guarda para cuando lo tenga."
+          }
+        }
+      }
+    },
+    "Earmark runs one download and one conversion at a time today; these limits apply once jobs run in parallel.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy Earmark ejecuta una descarga y una conversión a la vez; estos límites se aplicarán cuando las tareas corran en paralelo."
+          }
+        }
+      }
+    },
+    "File manager": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestor de archivos"
+          }
+        }
+      }
+    },
+    "Format": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Formato"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma"
+          }
+        }
+      }
+    },
+    "Language and Theme": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idioma y tema"
+          }
+        }
+      }
+    },
+    "Large": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grande"
+          }
+        }
+      }
+    },
+    "Library font size": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamaño de letra de la biblioteca"
+          }
+        }
+      }
+    },
+    "Light": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claro"
+          }
+        }
+      }
+    },
+    "MP3 bitrate": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasa de bits MP3"
+          }
+        }
+      }
+    },
+    "Medium": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mediano"
+          }
+        }
+      }
+    },
+    "Play a sound when a download, conversion or export finishes": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproducir un sonido al terminar una descarga, conversión o exportación"
+          }
+        }
+      }
+    },
+    "Play books in an external player instead of Earmark": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproducir libros en un reproductor externo en lugar de Earmark"
+          }
+        }
+      }
+    },
+    "Quit and reopen Earmark to apply the language.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cierra y vuelve a abrir Earmark para aplicar el idioma."
+          }
+        }
+      }
+    },
+    "Refresh library on launch": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizar la biblioteca al abrir"
+          }
+        }
+      }
+    },
+    "Show progress automatically when downloads start": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar el progreso al iniciar descargas"
+          }
+        }
+      }
+    },
+    "Simultaneous conversions: %lld": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversiones simultáneas: %lld"
+          }
+        }
+      }
+    },
+    "Simultaneous downloads: %lld": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargas simultáneas: %lld"
+          }
+        }
+      }
+    },
+    "Small": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pequeño"
+          }
+        }
+      }
+    },
+    "Sync with Audible every %lld hours": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizar con Audible cada %lld horas"
+          }
+        }
+      }
+    },
+    "System": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sistema"
+          }
+        }
+      }
+    },
+    "System Default": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Predeterminado del sistema"
+          }
+        }
+      }
+    },
+    "Use System Default": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar el predeterminado del sistema"
+          }
+        }
+      }
+    },
+    "Used by Export MP3 and MP3 copies. 64 kbps and below are mono.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se usa en Exportar MP3 y en las copias MP3. 64 kbps o menos son mono."
+          }
+        }
+      }
+    },
+    "Variable bitrate (VBR)": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tasa de bits variable (VBR)"
+          }
+        }
+      }
+    },
+    "Web browser": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navegador web"
+          }
+        }
+      }
+    }
+  }
+}
