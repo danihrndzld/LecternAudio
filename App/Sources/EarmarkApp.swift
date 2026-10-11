@@ -11,6 +11,7 @@ struct EarmarkApp: App {
             ContentView()
                 .environment(library)
                 .environment(player)
+                .environment(session)
                 .frame(minWidth: 900, minHeight: 560)
                 #if DEBUG
                 .task { await debugSnapshot() }

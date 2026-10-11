@@ -1,0 +1,6 @@
+{
+  "items": [
+    {"asin": "B0BXXXX003", "title": "Last Page Book", "authors": [{"name": "A. Writer"}], "merchandising_summary": "Only merch summary."}
+  ],
+  "response_groups": ["always-returned"]
+}

@@ -17,11 +17,10 @@ struct LibraryTable: View {
 
     var body: some View {
         @Bindable var model = model
-        let lib = model.library
         Table(model.visibleBooks.sorted(using: sortOrder), selection: $model.selection, sortOrder: $sortOrder) {
             TableColumn("Title", value: \.title) { b in
                 HStack(spacing: 8) {
-                    Cover(url: lib?.thumbURL(for: b), thumbnail: true).frame(width: 28, height: 28)
+                    Cover(url: model.thumbURL(for: b), thumbnail: true).frame(width: 28, height: 28)
                     Text(b.title).lineLimit(1)
                 }
             }
@@ -62,7 +61,7 @@ struct LibraryGrid: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20)], spacing: 24) {
                 ForEach(model.visibleBooks.sorted { $0.purchaseSort > $1.purchaseSort }) { b in
                     VStack(alignment: .leading, spacing: 6) {
-                        Cover(url: model.library?.artURL(for: b))
+                        Cover(url: model.artURL(for: b))
                             .aspectRatio(1, contentMode: .fit)
                             .overlay(alignment: .bottomTrailing) { StatusBadge(book: b).padding(6) }
                             .overlay {

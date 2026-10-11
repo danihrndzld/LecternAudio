@@ -71,7 +71,7 @@ public struct Book: Identifiable, Hashable, Sendable {
     public var primaryGenre: String { genre.split(separator: ":").first.map(String.init) ?? "" }
 }
 
-extension Book: Decodable {
+extension Book: Codable {
     enum CodingKeys: String, CodingKey {
         case asin, key, title, author, publisher, genre, summary, description, seconds, region, chapters, files
         case narratedBy = "narrated_by", rating = "rating_average", ratingCount = "rating_count"
@@ -99,6 +99,29 @@ extension Book: Decodable {
         imageURL = URL(string: s(.imageURL))
         chapters = (try? c.decode([Chapter].self, forKey: .chapters)) ?? []
         files = (try? c.decode([BookFile].self, forKey: .files)) ?? []
+    }
+
+    /// Writes the same books.json shape the decoder reads (Earmark's library.json).
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(asin, forKey: .asin)
+        try c.encode(key, forKey: .key)
+        try c.encode(title, forKey: .title)
+        try c.encode(author, forKey: .author)
+        try c.encode(narratedBy, forKey: .narratedBy)
+        try c.encode(publisher, forKey: .publisher)
+        try c.encode(genre, forKey: .genre)
+        try c.encode(summary, forKey: .summary)
+        try c.encode(seconds, forKey: .seconds)
+        try c.encode(region, forKey: .region)
+        try c.encodeIfPresent(rating.map { String($0) }, forKey: .rating)
+        try c.encodeIfPresent(ratingCount.map { String($0) }, forKey: .ratingCount)
+        try c.encodeIfPresent(releaseDate.map(Book.day.string(from:)), forKey: .releaseDate)
+        try c.encodeIfPresent(purchaseDate.map(Book.day.string(from:)), forKey: .purchaseDate)
+        try c.encodeIfPresent(readStatus?.rawValue, forKey: .readStatus)
+        try c.encodeIfPresent(imageURL?.absoluteString, forKey: .imageURL)
+        try c.encode(chapters, forKey: .chapters)
+        try c.encode(files, forKey: .files)
     }
 
     nonisolated(unsafe) static let day: DateFormatter = {

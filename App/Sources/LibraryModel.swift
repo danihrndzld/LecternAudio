@@ -36,7 +36,17 @@ enum LibraryFilter: Hashable {
 
 @Observable
 final class LibraryModel {
-    private(set) var library: OpenAudibleLibrary?
+    private(set) var library: OpenAudibleLibrary? { didSet { merge() } }
+    /// The list from Audible, saved at ~/Library/Application Support/Earmark/library.json. Empty when signed out.
+    private var audibleBooks: [Book] = [] { didSet { merge() } }
+    /// Audible's list with local files from the OpenAudible folder, or just the folder when not synced.
+    private(set) var books: [Book] = []
+    private(set) var isSyncing = false
+    private(set) var syncedCount = 0
+    var syncError: String?
+    private(set) var lastSync = UserDefaults.standard.object(forKey: "lastSync") as? Date {
+        didSet { UserDefaults.standard.set(lastSync, forKey: "lastSync") }
+    }
     private(set) var error: String?
     var filter: LibraryFilter = .all
     var search = ""
@@ -50,7 +60,44 @@ final class LibraryModel {
 
     init() { restore() }
 
-    var books: [Book] { library?.books ?? [] }
+    private static let store = URL.applicationSupportDirectory.appending(path: "Earmark/library.json")
+
+    private func merge() { books = AudibleLibrary.merge(audible: audibleBooks, local: library?.books ?? []) }
+
+    /// Signed out, the app shows only the OpenAudible folder, as before sign-in existed.
+    func useAudible(_ signedIn: Bool) {
+        if signedIn {
+            if audibleBooks.isEmpty { audibleBooks = AudibleLibrary.load(from: Self.store) }
+        } else {
+            audibleBooks = []
+            lastSync = nil
+            try? FileManager.default.removeItem(at: Self.store)
+        }
+    }
+
+    func sync(_ account: AudibleAccount) {
+        guard !isSyncing else { return }
+        isSyncing = true
+        syncedCount = 0
+        Task {
+            do {
+                let fetched = try await AudibleLibrary.fetch(account: account, send: { try await URLSession.shared.data(for: $0) }) { n in
+                    Task { @MainActor in self.syncedCount = n }
+                }
+                try AudibleLibrary.save(fetched, to: Self.store)
+                audibleBooks = fetched
+                lastSync = .now
+            } catch is CancellationError {
+            } catch {
+                syncError = error.localizedDescription
+            }
+            isSyncing = false
+        }
+    }
+
+    /// Local cover when the folder has one, else Audible's CDN image.
+    func artURL(for book: Book) -> URL? { library?.artURL(for: book) ?? book.imageURL }
+    func thumbURL(for book: Book) -> URL? { library?.thumbURL(for: book) ?? book.imageURL }
 
     var visibleBooks: [Book] {
         let q = search.trimmingCharacters(in: .whitespaces)

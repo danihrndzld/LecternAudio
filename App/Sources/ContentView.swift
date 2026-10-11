@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(LibraryModel.self) private var model
+    @Environment(AudibleSession.self) private var session
     @Environment(Player.self) private var player
     @AppStorage("viewMode") private var gridMode = false
     @State private var showInspector = true
@@ -14,7 +15,7 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 190, ideal: 220)
         } detail: {
             Group {
-                if model.library == nil {
+                if model.books.isEmpty {
                     Onboarding()
                 } else if gridMode {
                     LibraryGrid()
@@ -23,7 +24,7 @@ struct ContentView: View {
                 }
             }
             .navigationTitle(model.filter.title)
-            .navigationSubtitle(model.library == nil ? "" : "\(model.visibleBooks.count) books")
+            .navigationSubtitle(model.books.isEmpty ? "" : "\(model.visibleBooks.count) books")
             .safeAreaInset(edge: .bottom) {
                 if player.book != nil { PlayerBar() }
             }
@@ -48,8 +49,21 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
             }
             ToolbarItem {
+                Button("Sync with Audible", systemImage: "arrow.triangle.2.circlepath") {
+                    if let a = session.account { model.sync(a) }
+                }
+                .help(session.account == nil ? "Sign in to Audible in Settings to sync" : "Sync library from Audible")
+                .disabled(session.account == nil || model.isSyncing)
+            }
+            ToolbarItem {
                 Button("Info", systemImage: "info.circle") { showInspector.toggle() }
             }
+        }
+        .onChange(of: session.account == nil, initial: true) { _, signedOut in model.useAudible(!signedOut) }
+        .alert("Sync failed", isPresented: Binding { model.syncError != nil } set: { if !$0 { model.syncError = nil } }) {
+            Button("OK") {}
+        } message: {
+            Text(model.syncError ?? "")
         }
         .fileImporter(isPresented: $model.isPickingFolder, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result { model.open(url) }
@@ -81,12 +95,22 @@ private struct Sidebar: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if model.library != nil {
-                Text("\(model.books.count) books · \(model.totalHours.formatted()) hours")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+            VStack(alignment: .leading, spacing: 4) {
+                if !model.books.isEmpty {
+                    Text("\(model.books.count) books · \(model.totalHours.formatted()) hours")
+                }
+                if model.isSyncing {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.mini)
+                        Text("Syncing… \(model.syncedCount) books")
+                    }
+                } else if let last = model.lastSync {
+                    Text("Synced \(last, format: .relative(presentation: .named))")
+                }
             }
+            .font(.caption).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
         }
     }
 
