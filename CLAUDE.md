@@ -4,7 +4,7 @@ Native macOS audiobook manager for a user's own Audible library; it replaces Ope
 Feature inventory of the old app: `docs/openaudible-spec.md`. Stack decision: `docs/adr/0001-stack-and-workflow.md`.
 
 ## Layout
-- `Packages/AudibleCore`: UI-free Swift package (Foundation only). Models, OpenAudible import, and later Audible API, download, decrypt. Must build on Linux (CI job `core-linux`), so never import AppKit/SwiftUI/AVFoundation here; wrap Apple-only code in `#if canImport(...)`.
+- `Packages/AudibleCore`: UI-free Swift package (Foundation + apple/swift-crypto for SHA-256/RSA). Models, OpenAudible import, and later Audible API, download, decrypt. Must build on Linux (CI job `core-linux`), so never import AppKit/SwiftUI/AVFoundation here; wrap Apple-only code in `#if canImport(...)`.
 - `App/Sources`: SwiftUI app, MainActor by default. `project.yml` is the source of truth; `Earmark.xcodeproj` is generated and git-ignored.
 
 ## Rules
