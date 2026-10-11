@@ -52,6 +52,7 @@ final class LibraryModel {
     var search = ""
     var selection: Set<Book.ID> = []
     var isPickingFolder = false
+    let conversion = ConversionModel()
     /// Progress (0...1) of running MP3 exports.
     private(set) var exports: [Book.ID: Double] = [:]
     @ObservationIgnored private var exportTasks: [Book.ID: Task<Void, Never>] = [:]

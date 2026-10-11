@@ -14,7 +14,12 @@ struct EarmarkApp: App {
                 .environment(session)
                 .frame(minWidth: 900, minHeight: 560)
                 #if DEBUG
-                .task { await debugSnapshot() }
+                .task {
+                    if ProcessInfo.processInfo.environment["EARMARK_CONVERSION_PREVIEW"] == "1", let book = library.selectedBook {
+                        library.conversion.book = book
+                    }
+                    await debugSnapshot()
+                }
                 #endif
         }
         .commands {
@@ -33,6 +38,12 @@ struct EarmarkApp: App {
                     .keyboardShortcut(.leftArrow, modifiers: .command)
                 Button("Forward 30 Seconds") { player.skip(30) }
                     .keyboardShortcut(.rightArrow, modifiers: .command)
+            }
+            CommandMenu("Conversion") {
+                Button("Convert Selected Book to M4B…") {
+                    if let book = library.selectedBook { library.conversion.prepare(book) }
+                }
+                .disabled(library.selectedBook.flatMap { library.library?.aaxURL(for: $0) } == nil || library.conversion.isRunning)
             }
         }
 
@@ -56,9 +67,11 @@ struct EarmarkApp: App {
     let env = ProcessInfo.processInfo.environment
     guard let out = env["EARMARK_SNAPSHOT"] else { return }
     try? await Task.sleep(for: .seconds(1))
-    guard let window = NSApp.windows.first, let view = window.contentView?.superview else { print("snapshot: no window", NSApp.windows); return }
+    guard let window = NSApp.windows.first else { print("snapshot: no window", NSApp.windows); return }
     window.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
     try? await Task.sleep(for: .seconds(3))
+    let target = env["EARMARK_CONVERSION_PREVIEW"] == "1" ? (window.attachedSheet ?? window) : window
+    guard let view = target.contentView?.superview else { return }
     guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
     view.cacheDisplay(in: view.bounds, to: rep)
     do { try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out)) } catch { print("snapshot:", error) }

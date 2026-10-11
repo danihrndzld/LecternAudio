@@ -130,6 +130,10 @@ struct BookActions: View {
             Button("Play", systemImage: "play.fill") { player.play(book, url: url) }
             Button("Show in Finder", systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
+        if model.library?.aaxURL(for: book) != nil {
+            Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.conversion.prepare(book) }
+                .disabled(model.conversion.isRunning)
+        }
         if model.exports[book.id] != nil {
             Button("Cancel MP3 Export", systemImage: "xmark.circle") { model.cancelExport(book.id) }
         } else if model.m4bURL(for: book) != nil {

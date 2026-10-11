@@ -18,6 +18,10 @@ targets:
     sources: [App/Sources]
     dependencies:
       - package: AudibleCore
+    postBuildScripts:
+      - name: Build and embed FFmpeg
+        script: /bin/bash "$SRCROOT/scripts/build-ffmpeg.sh"
+        basedOnDependencyAnalysis: false
     entitlements:
       path: App/Earmark.entitlements
       properties:

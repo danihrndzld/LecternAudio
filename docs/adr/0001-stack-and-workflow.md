@@ -6,7 +6,7 @@ Status: accepted 2026-10-11. The memo below was written by an advisor model (Fab
 - No release, notarization or Sparkle pipeline yet: the only signing identity available is Apple Development (no Developer ID). Add it when a Developer ID exists.
 - GRDB is deferred until Earmark owns its own library store (sync issue). v0.1 reads OpenAudible's `books.json` directly.
 - macOS CI minutes are billed on private repos; the core suite also runs on Linux to keep feedback cheap.
-- DRM is out of scope (amended 2026-10-11): no activation-bytes recovery, voucher decryption or AAX/AAXC decryption. The memo's decrypt section below is superseded. Earmark manages, plays and exports already-decrypted files.
+- AAX conversion is supported through bundled LGPL FFmpeg and user-supplied activation bytes (amended at the owner's request, 2026-10-11). The helper inherits the app sandbox; arbitrary external executables cannot be launched there. Account-driven key acquisition, downloads and AAXC voucher/decryption support are deferred to the end-to-end workflow in `../aax-conversion.md`; OpenAudible's licensed key service is not a dependency. The memo's native decrypt proposal below is superseded.
 
 ---
 
