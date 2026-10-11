@@ -4,6 +4,7 @@ import SwiftUI
 struct EarmarkApp: App {
     @State private var library = LibraryModel()
     @State private var player = Player()
+    @State private var session = AudibleSession()
 
     var body: some Scene {
         WindowGroup {
@@ -22,6 +23,7 @@ struct EarmarkApp: App {
                 Button("Reload Library") { library.reload() }
                     .keyboardShortcut("r")
             }
+            AccountCommands()
             CommandMenu("Playback") {
                 Button(player.isPlaying ? "Pause" : "Play") { player.toggle() }
                     .keyboardShortcut(.space, modifiers: [])
@@ -31,6 +33,17 @@ struct EarmarkApp: App {
                 Button("Forward 30 Seconds") { player.skip(30) }
                     .keyboardShortcut(.rightArrow, modifiers: .command)
             }
+        }
+
+        Window("Sign In to Audible", id: SignInView.windowID) {
+            SignInView().environment(session)
+        }
+        .defaultSize(width: 480, height: 720)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
+
+        Settings {
+            AccountSettings().environment(session)
         }
     }
 }

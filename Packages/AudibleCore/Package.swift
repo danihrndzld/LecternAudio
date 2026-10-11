@@ -5,8 +5,14 @@ let package = Package(
     name: "AudibleCore",
     platforms: [.macOS("26.0")],
     products: [.library(name: "AudibleCore", targets: ["AudibleCore"])],
+    // SHA-256 and RSA signing on Linux too (CryptoKit is Apple-only).
+    dependencies: [.package(url: "https://github.com/apple/swift-crypto.git", from: "4.5.2")],
     targets: [
-        .target(name: "AudibleCore", dependencies: ["CLAME"]),
+        .target(name: "AudibleCore", dependencies: [
+            "CLAME",
+            .product(name: "Crypto", package: "swift-crypto"),
+            .product(name: "CryptoExtras", package: "swift-crypto"),
+        ]),
         // LAME 3.100, LGPL; see Sources/CLAME/README.md.
         .target(
             name: "CLAME",

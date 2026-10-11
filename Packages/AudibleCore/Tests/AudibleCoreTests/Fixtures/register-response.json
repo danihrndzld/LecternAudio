@@ -1,0 +1,35 @@
+{
+  "response": {
+    "success": {
+      "extensions": {
+        "device_info": {
+          "device_name": "Dani's Audible for iPhone",
+          "device_serial_number": "REDACTED",
+          "device_type": "A2CZJZGLK2JJVM"
+        },
+        "customer_info": {
+          "account_pool": "Amazon",
+          "user_id": "REDACTED",
+          "home_region": "NA",
+          "name": "Dani Test",
+          "given_name": "Dani"
+        }
+      },
+      "tokens": {
+        "website_cookies": [{"Path": "/", "Secure": "true", "Value": "REDACTED", "Expires": "REDACTED", "Domain": ".amazon.com", "HttpOnly": "true", "Name": "session-token"}],
+        "store_authentication_cookie": {"cookie": "REDACTED"},
+        "mac_dms": {
+          "device_private_key": "-----BEGIN RSA PRIVATE KEY-----\nREDACTED\n-----END RSA PRIVATE KEY-----\n",
+          "adp_token": "{enc:REDACTED}{key:REDACTED}{iv:REDACTED}{name:QURQVG9rZW5FbmNyeXB0aW9uS2V5}{serial:Mg==}"
+        },
+        "bearer": {
+          "access_token": "Atna|REDACTED-ACCESS",
+          "refresh_token": "Atnr|REDACTED-REFRESH",
+          "expires_in": "3600"
+        }
+      },
+      "customer_id": "amzn1.account.REDACTED"
+    },
+    "request_id": "REDACTED"
+  }
+}
