@@ -25,13 +25,14 @@ public struct OpenAudibleLibrary: Sendable {
         book.files.first { $0.type == .m4b || $0.type == .mp3 }.map(url(for:))
     }
 
+    /// Local cover if OpenAudible saved one, else Audible's CDN image (books never downloaded).
     public func artURL(for book: Book) -> URL? {
-        book.files.first { $0.type == .art }.map(url(for:))
+        book.files.first { $0.type == .art }.map(url(for:)) ?? book.imageURL
     }
 
     /// Small cover if OpenAudible generated one (often it hasn't), else the full art.
     public func thumbURL(for book: Book) -> URL? {
-        guard let art = artURL(for: book) else { return nil }
+        guard let art = artURL(for: book), art.isFileURL else { return artURL(for: book) }
         let thumb = root.appendingPathComponent("thumb").appendingPathComponent(art.lastPathComponent)
         return FileManager.default.fileExists(atPath: thumb.path) ? thumb : art
     }

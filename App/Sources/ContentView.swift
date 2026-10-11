@@ -70,7 +70,8 @@ private struct Sidebar: View {
             }
             Section("Files") {
                 row(.downloaded, "arrow.down.circle")
-                row(.notDownloaded, "icloud")
+                row(.notConverted, "lock")
+                row(.audibleOnly, "icloud")
                 row(.pdfs, "doc.richtext")
             }
             Section("Genres") {
