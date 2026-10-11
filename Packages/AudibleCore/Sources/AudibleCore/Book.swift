@@ -77,8 +77,8 @@ extension Book: Decodable {
         func s(_ k: CodingKeys) -> String { (try? c.decode(String.self, forKey: k)) ?? "" }
         asin = s(.asin)
         key = s(.key)
-        title = s(.title)
-        author = s(.author)
+        title = HTMLText.markdown(s(.title))
+        author = HTMLText.markdown(s(.author))
         narratedBy = s(.narratedBy)
         publisher = s(.publisher)
         genre = s(.genre)
@@ -98,7 +98,7 @@ extension Book: Decodable {
     nonisolated(unsafe) static let day: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
+        f.timeZone = .current  // calendar dates: midnight local so they display as written
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()

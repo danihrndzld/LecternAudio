@@ -67,15 +67,9 @@ struct BookDetail: View {
         }
     }
 
-    /// Audible summaries are HTML; render them as attributed text, falling back to plain.
     private var summary: AttributedString {
-        let html = "<span style=\"font-family: -apple-system; font-size: 13px\">\(book.summary)</span>"
-        if let ns = try? NSAttributedString(data: Data(html.utf8), options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue], documentAttributes: nil),
-           var a = try? AttributedString(ns, including: \.appKit) {
-            a.foregroundColor = nil
-            return a
-        }
-        return AttributedString(book.summary)
+        let md = HTMLText.markdown(book.summary)
+        return (try? AttributedString(markdown: md, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(md)
     }
 
     @ViewBuilder private func field(_ label: String, _ value: String?) -> some View {
