@@ -14,6 +14,7 @@ struct LibraryTable: View {
     @Environment(LibraryModel.self) private var model
     @Environment(Player.self) private var player
     @State private var sortOrder: [KeyPathComparator<Book>] = [.init(\.purchaseSort, order: .reverse)]
+    @AppStorage(Prefs.tableFontSize) private var fontSize = "medium"
 
     var body: some View {
         @Bindable var model = model
@@ -40,6 +41,7 @@ struct LibraryTable: View {
             TableColumn("Genre", value: \.primaryGenre).width(min: 100, ideal: 150)
             TableColumn("") { b in StatusBadge(book: b) }.width(24)
         }
+        .font(.system(size: ["small": 11, "large": 15][fontSize] ?? 13))
         .contextMenu(forSelectionType: Book.ID.self) { ids in
             if let id = ids.first, let b = model.books.first(where: { $0.id == id }) { BookActions(book: b, model: model, player: player) }
         } primaryAction: { ids in
@@ -128,7 +130,7 @@ struct BookActions: View {
     var body: some View {
         if let url = model.audioURL(for: book) {
             Button("Play", systemImage: "play.fill") { player.play(book, url: url) }
-            Button("Show in Finder", systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            Button("Show in Finder", systemImage: "folder") { Prefs.reveal(url) }
         }
         if model.library?.aaxURL(for: book) != nil {
             Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.convert(book) }
@@ -147,7 +149,7 @@ struct BookActions: View {
             Button("Open PDF", systemImage: "doc.richtext") { NSWorkspace.shared.open(pdf) }
         }
         if !book.asin.isEmpty, let web = URL(string: "https://www.audible.com/pd/\(book.asin)") {
-            Button("View on Audible", systemImage: "safari") { NSWorkspace.shared.open(web) }
+            Button("View on Audible", systemImage: "safari") { Prefs.open(web, appKey: Prefs.browserApp) }
         }
     }
 }

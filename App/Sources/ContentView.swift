@@ -8,6 +8,12 @@ struct ContentView: View {
     @AppStorage("viewMode") private var gridMode = false
     @State private var showInspector = true
     @State private var showDownloads = false
+    @State private var launched = false
+    @AppStorage(Prefs.refreshOnLaunch) private var refreshOnLaunch = true
+    @AppStorage(Prefs.autoSync) private var autoSync = true
+    @AppStorage(Prefs.autoSyncHours) private var autoSyncHours = 24
+    @AppStorage(Prefs.showProgress) private var showProgress = false
+    @AppStorage(Prefs.appearance) private var appearance = "system"
 
     var body: some View {
         @Bindable var model = model
@@ -72,17 +78,24 @@ struct ContentView: View {
             #if DEBUG
             if ProcessInfo.processInfo.environment["EARMARK_DOWNLOADS_PREVIEW"] == "1" { showDownloads = true }
             #endif
+            // The first pass is the launch; later passes are sign-ins, which always sync.
+            defer { launched = true }
             guard session.account != nil else { return }
             do {
                 let account = try await session.currentAccount()
                 try Task.checkCancellation()
                 model.useAudible(session)
-                model.sync(account)
+                if refreshOnLaunch || launched { model.sync(account) }
             } catch is CancellationError {
             } catch {
                 session.error = "Could not restore the session. Open Account Settings to sign in again."
             }
         }
+        .task(id: autoSyncID) { await autoSyncLoop() }
+        .onChange(of: model.downloads.activeID) { old, new in
+            if showProgress, old == nil, new != nil { showDownloads = true }
+        }
+        .onChange(of: appearance, initial: true) { _, new in applyAppearance(new) }
         .sheet(isPresented: $showDownloads) { DownloadsView(downloads: model.downloads, library: model) }
         .alert("Sync failed", isPresented: Binding { model.syncError != nil } set: { if !$0 { model.syncError = nil } }) {
             Button("OK") {}
@@ -95,6 +108,23 @@ struct ContentView: View {
         .sheet(isPresented: Binding(get: { model.conversion.book != nil }, set: { if !$0 { model.conversion.dismiss() } })) {
             ConversionView(conversion: model.conversion, library: model)
         }
+    }
+
+    private var autoSyncHoursOrOff: Int { autoSync ? autoSyncHours : 0 }
+    private var autoSyncID: String { "\(session.account?.deviceSerial ?? "")|\(autoSyncHoursOrOff)" }
+
+    /// Syncs every N hours while signed in; restarts when the account or interval changes.
+    private func autoSyncLoop() async {
+        var last = model.lastSync
+        while session.account != nil, let delay = AutoSync.delay(hours: autoSyncHoursOrOff, last: last) {
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            last = .now
+            if let account = try? await session.currentAccount() { model.sync(account) }
+        }
+    }
+
+    private func applyAppearance(_ name: String) {
+        NSApp.appearance = name == "system" ? nil : NSAppearance(named: name == "dark" ? .darkAqua : .aqua)
     }
 }
 

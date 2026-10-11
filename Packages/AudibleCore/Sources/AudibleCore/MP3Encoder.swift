@@ -5,6 +5,9 @@ import Foundation
 public final class MP3Encoder {
     public enum Mode: Sendable { case cbr, vbr }
 
+    /// MPEG-1/2 Layer III bitrates (kbps) LAME accepts, 32k…320k.
+    public static let bitrates = [32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320]
+
     public struct Failure: Error, CustomStringConvertible {
         public let code: Int32
         public var description: String { "LAME error \(code)" }

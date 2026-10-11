@@ -66,7 +66,10 @@ final class LibraryModel {
 
     private static let bookmarkKey = "libraryBookmark"
 
-    init() { restore() }
+    init() {
+        Prefs.register()
+        restore()
+    }
 
     private var store: URL? { accountRoot?.appendingPathComponent("catalog.json") }
 
@@ -153,6 +156,11 @@ final class LibraryModel {
         try AudibleLibrary.save(saved, to: root.appendingPathComponent("books.json"))
         downloadedLibrary = try OpenAudibleLibrary(root: root)
         merge()
+        // Output format MP3: keep the M4B (the player needs it) and add an MP3 copy beside it.
+        let mp3 = output.deletingPathExtension().appendingPathExtension("mp3")
+        if UserDefaults.standard.string(forKey: Prefs.outputFormat) == "mp3", !FileManager.default.fileExists(atPath: mp3.path) {
+            export(local, source: output, to: mp3.appendingPathExtension("part"), byChapter: false)
+        }
     }
 
     /// Local cover when the folder has one, else Audible's CDN image.
@@ -208,7 +216,7 @@ final class LibraryModel {
         return book.files.first { $0.type == .m4b }.flatMap { library?.url(for: $0) }
     }
 
-    /// Asks where to save, then converts the book's M4B to MP3 (64 kbps CBR mono) in the background.
+    /// Asks where to save, then converts the book's M4B to MP3 (bitrate and VBR from Settings) in the background.
     func exportMP3(_ book: Book, byChapter: Bool) {
         guard let source = m4bURL(for: book), exportTasks[book.id] == nil else { return }
         let name = book.title.replacing(/[\/:]/, with: "-")
@@ -229,7 +237,12 @@ final class LibraryModel {
             guard panel.runModal() == .OK, let url = panel.url else { return }
             destination = url
         }
+        export(book, source: source, to: destination, byChapter: byChapter)
+    }
 
+    /// A destination ending in `.part` is renamed without it once the export succeeds.
+    private func export(_ book: Book, source: URL, to destination: URL, byChapter: Bool) {
+        guard exportTasks[book.id] == nil else { return }
         var tag = ID3Tag()
         tag.title = book.title
         tag.album = book.title
@@ -238,8 +251,8 @@ final class LibraryModel {
         tag.genre = book.primaryGenre
         tag.year = book.releaseDate.map { String(Calendar.current.component(.year, from: $0)) } ?? ""
         tag.comment = HTMLText.markdown(book.summary)
-        tag.cover = library?.artURL(for: book).flatMap { try? Data(contentsOf: $0) }
-        var options = MP3Export.Options()
+        tag.cover = (library?.artURL(for: book) ?? book.imageURL).flatMap { $0.isFileURL ? try? Data(contentsOf: $0) : nil }
+        var options = Prefs.mp3Options
         options.splitChapters = byChapter
 
         let id = book.id
@@ -249,6 +262,10 @@ final class LibraryModel {
                 try await MP3Export.run(source: source, destination: destination, tag: tag, options: options) { p in
                     Task { @MainActor in if self.exports[id] != nil { self.exports[id] = p } }
                 }
+                if destination.pathExtension == "part" {
+                    try FileManager.default.moveItem(at: destination, to: destination.deletingPathExtension())
+                }
+                Prefs.playCompletionSound()
             } catch is CancellationError {
             } catch {
                 NSAlert(error: error).runModal()

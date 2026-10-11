@@ -1,5 +1,5 @@
+import AppKit
 import AudibleCore
-import Foundation
 import Observation
 import Security
 
@@ -105,6 +105,7 @@ final class ConversionModel {
                 if libraryModel.library?.root == library.root { libraryModel.reload() }
                 progress = 1
                 succeeded = true
+                Prefs.playCompletionSound()
                 message = "Saved to books/Earmark/\(converted.lastPathComponent)"
             } catch is CancellationError {
                 message = "Conversion cancelled. Your AAX file is unchanged."
