@@ -114,6 +114,9 @@ private struct Sidebar: View {
             .font(.caption).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
+            // Opaque bar so list rows scrolling underneath don't bleed through the text.
+            .background(.bar)
+            .overlay(alignment: .top) { Divider() }
         }
     }
 
