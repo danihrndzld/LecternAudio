@@ -45,8 +45,9 @@ final class LibraryModel {
     private(set) var isSyncing = false
     private(set) var syncedCount = 0
     var syncError: String?
-    private(set) var lastSync = UserDefaults.standard.object(forKey: "lastSync") as? Date {
-        didSet { UserDefaults.standard.set(lastSync, forKey: "lastSync") }
+    /// Saved per account ("lastSync.<storageID>") so launch and account switches never wipe another account's time.
+    private(set) var lastSync: Date? {
+        didSet { if let accountIdentity { UserDefaults.standard.set(lastSync, forKey: "lastSync.\(accountIdentity)") } }
     }
     private(set) var error: String?
     var filter: LibraryFilter = .all
@@ -76,6 +77,10 @@ final class LibraryModel {
     private var syncGeneration = UUID()
     private var accountIdentity: String?
     private weak var session: AudibleSession?
+    /// The library folder whose security scope is open; stopped when another folder replaces it.
+    @ObservationIgnored private var scopedRoot: URL?
+    /// Imported files whose security scope is open for this app session.
+    @ObservationIgnored var scopedImports: Set<URL> = []
     /// Progress (0...1) of running MP3 exports.
     private(set) var exports: [Book.ID: Double] = [:]
     @ObservationIgnored private var exportTasks: [Book.ID: Task<Void, Never>] = [:]
@@ -108,7 +113,7 @@ final class LibraryModel {
         accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Earmark/accounts/\($0)") }
         downloadedLibrary = accountRoot.flatMap { try? OpenAudibleLibrary(root: $0) }
         audibleBooks = store.map { AudibleLibrary.load(from: $0) } ?? []
-        lastSync = nil
+        lastSync = identity.flatMap { UserDefaults.standard.object(forKey: "lastSync.\($0)") as? Date }
         downloads.configure(session: session, library: self, root: accountRoot)
         if identity == nil { conversion.cancel() }
         merge()
@@ -212,10 +217,15 @@ final class LibraryModel {
     var totalHours: Int { books.reduce(0) { $0 + $1.seconds } / 3600 }
 
     func open(_ url: URL) {
-        let scoped = url.startAccessingSecurityScopedResource()
+        let isOpen = scopedRoot?.standardizedFileURL == url.standardizedFileURL
+        let scoped = !isOpen && url.startAccessingSecurityScopedResource()
         do {
             library = try OpenAudibleLibrary(root: url)
             error = nil
+            if !isOpen {
+                scopedRoot?.stopAccessingSecurityScopedResource()
+                scopedRoot = scoped ? url : nil
+            }
             if let data = try? url.bookmarkData(options: .withSecurityScope) {
                 UserDefaults.standard.set(data, forKey: Self.bookmarkKey)
                 recentLibraries = [data] + recentLibraries.filter { Self.resolve($0)?.standardizedFileURL != url.standardizedFileURL }.prefix(4)
@@ -234,7 +244,13 @@ final class LibraryModel {
     func refreshFiles() {
         reload()
         if let accountRoot { downloadedLibrary = try? OpenAudibleLibrary(root: accountRoot) }
-        imported.removeAll { b in importedURLs[b.id].map { !FileManager.default.fileExists(atPath: $0.path) } ?? true }
+        imported.removeAll { b in
+            guard let url = importedURLs[b.id], FileManager.default.fileExists(atPath: url.path) else {
+                if let url = importedURLs.removeValue(forKey: b.id), scopedImports.remove(url) != nil { url.stopAccessingSecurityScopedResource() }
+                return true
+            }
+            return false
+        }
         saveImports()
         merge()
         AppLog.shared.info("Refreshed files: \(books.count) books")

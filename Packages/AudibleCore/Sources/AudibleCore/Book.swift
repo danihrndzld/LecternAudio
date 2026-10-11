@@ -7,6 +7,9 @@ public struct Chapter: Codable, Hashable, Sendable {
 
     public var start: TimeInterval { Double(startMs) / 1000 }
 
+    /// Seconds to whole milliseconds, or nil for NaN, infinity or out-of-range values (`Int(_:)` would trap).
+    public static func millis(_ seconds: Double) -> Int? { Int(exactly: (seconds * 1000).rounded()) }
+
     public init(title: String, startMs: Int, lengthMs: Int) {
         self.title = title
         self.startMs = startMs

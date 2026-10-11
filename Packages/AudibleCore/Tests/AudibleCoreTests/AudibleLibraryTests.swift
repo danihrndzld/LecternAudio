@@ -125,3 +125,42 @@ private actor Log {
     #expect(AudibleLibrary.load(from: url) == local)
     #expect(AudibleLibrary.load(from: url.appendingPathExtension("missing")).isEmpty)
 }
+
+@Test func mergeKeepsOpenAudibleFilesBesideDownload() {
+    var openAudible = AudibleLibrary.book(from: .init(asin: "B0BXXXX001", title: "Book"), marketplace: Marketplace.all[0])
+    openAudible.files = [BookFile(path: "B0BXXXX001.aax", type: .aax), BookFile(path: "B0BXXXX001.pdf", type: .pdf),
+                         BookFile(path: "B0BXXXX001.m4b", type: .m4b)]
+    var downloaded = openAudible
+    downloaded.files = [BookFile(path: "B0BXXXX001.m4b", type: .m4b)]
+    let merged = AudibleLibrary.merge(audible: [openAudible], local: [downloaded])
+    #expect(merged.count == 1)
+    let files = merged[0].files
+    #expect(files.count == 3)
+    #expect(Set(files.compactMap(\.type)) == [.m4b, .pdf, .aax])
+    #expect(files.first { $0.type == .m4b } == downloaded.files[0])
+    #expect(merged[0].hasPDF && merged[0].hasAudio && merged[0].hasEncrypted)
+}
+
+@Test func fetchDropsDuplicateASINsFromShiftedPages() async throws {
+    // A purchase mid-sync shifts page 2 by one: 002 appears again and is dropped, keeping page 1's copy.
+    let pages = [
+        #"{"items":[{"asin":"B0BXXXX001","title":"One"},{"asin":"B0BXXXX002","title":"Two"}]}"#,
+        #"{"items":[{"asin":"B0BXXXX002","title":"Two again"},{"asin":"B0BXXXX003","title":"Three"}]}"#,
+        #"{"items":[]}"#,
+    ].map { Data($0.utf8) }
+    let books = try await AudibleLibrary.fetch(account: testAccount(), pageSize: 2, retryDelay: .zero, send: { req in
+        let page = Int(URLComponents(url: req.url!, resolvingAgainstBaseURL: false)!.queryItems!.first { $0.name == "page" }!.value!)!
+        return ok(pages[page - 1], req)
+    })
+    #expect(books.map(\.asin) == ["B0BXXXX001", "B0BXXXX002", "B0BXXXX003"])
+    #expect(books[1].title == "Two")
+}
+
+@Test func millisRejectsNonFiniteSeconds() {
+    #expect(Chapter.millis(1.5) == 1500)
+    #expect(Chapter.millis(0) == 0)
+    #expect(Chapter.millis(.nan) == nil)
+    #expect(Chapter.millis(.infinity) == nil)
+    #expect(Chapter.millis(-.infinity) == nil)
+    #expect(Chapter.millis(1e300) == nil)
+}

@@ -25,11 +25,13 @@ public enum AudibleLibrary {
     public static func fetch(account: AudibleAccount, pageSize: Int = 100, retryDelay: Duration = .seconds(1),
                              send: Send, progress: @Sendable (Int) -> Void = { _ in }) async throws -> [Book] {
         var books: [Book] = []
+        // Pages shift if a purchase lands mid-sync; keep each ASIN's first occurrence.
+        var seen = Set<String>()
         for page in 1... {
             var request = request(page: page, pageSize: pageSize, marketplace: account.marketplace)
             try account.sign(&request)
             let items: [Item] = try await withRetry(delay: retryDelay) { try await parseItems(send(request)) }
-            books += items.map { book(from: $0, marketplace: account.marketplace) }
+            books += items.compactMap { seen.insert($0.asin).inserted ? book(from: $0, marketplace: account.marketplace) : nil }
             progress(books.count)
             if items.count < pageSize { break }
         }
@@ -103,6 +105,7 @@ public enum AudibleLibrary {
     }
 
     /// Audible gives the list and metadata; the OpenAudible folder gives files, chapters and read status.
+    /// Files are the local ones plus any `audible`-side file of another type (OpenAudible's PDF, art, AAX beside a download).
     /// Books only in the folder (not on this account) are kept after the Audible ones.
     public static func merge(audible: [Book], local: [Book]) -> [Book] {
         guard !audible.isEmpty else { return local }
@@ -111,7 +114,8 @@ public enum AudibleLibrary {
             guard let l = byASIN[a.asin] else { return a }
             var b = a
             b.key = l.key
-            b.files = l.files
+            let localTypes = Set(l.files.map(\.type))
+            b.files = l.files + a.files.filter { !localTypes.contains($0.type) && !(l.hasAudio && [.m4b, .mp3].contains($0.type)) }
             b.chapters = l.chapters
             b.readStatus = a.readStatus ?? l.readStatus
             if b.summary.isEmpty { b.summary = l.summary }

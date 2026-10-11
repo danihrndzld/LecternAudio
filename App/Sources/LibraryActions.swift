@@ -40,7 +40,7 @@ extension LibraryModel {
             var stale = false
             guard let url = (try? URL(resolvingBookmarkData: record.bookmark, options: .withSecurityScope, bookmarkDataIsStale: &stale))
                 ?? (try? URL(resolvingBookmarkData: record.bookmark, bookmarkDataIsStale: &stale)) else { continue }
-            _ = url.startAccessingSecurityScopedResource()
+            if url.startAccessingSecurityScopedResource() { scopedImports.insert(url) }
             importedURLs[record.book.id] = url
             books.append(record.book)
         }
@@ -78,23 +78,36 @@ extension LibraryModel {
                     .filter { extensions.contains($0.pathExtension.lowercased()) }
                     .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
             }
-            try await importFiles(files)
+            let (added, skipped) = try await importFiles(files)
+            let alert = NSAlert()
+            alert.messageText = "Imported \(added), skipped \(skipped)"
+            if skipped > 0 { alert.informativeText = "Skipped files could not be read as audio. See the log for their names." }
+            alert.runModal()
         }
     }
 
-    func importFiles(_ urls: [URL]) async throws {
-        var added = 0
+    /// Unreadable files are skipped and logged; whatever was added is saved even if the job is cancelled.
+    func importFiles(_ urls: [URL]) async throws -> (added: Int, skipped: Int) {
+        var added = 0, skipped = 0
+        defer {
+            saveImports()
+            AppLog.shared.info("Imported \(added) file(s), skipped \(skipped)")
+        }
         for url in urls {
             try Task.checkCancellation()
-            _ = url.startAccessingSecurityScopedResource()
-            let book = try await Self.readBook(url)
+            if !scopedImports.contains(url), url.startAccessingSecurityScopedResource() { scopedImports.insert(url) }
+            let book: Book
+            do { book = try await Self.readBook(url) } catch {
+                skipped += 1
+                AppLog.shared.error("Skipped \(url.lastPathComponent): \(error.localizedDescription)")
+                continue
+            }
             imported.removeAll { $0.id == book.id }
             imported.append(book)
             importedURLs[book.id] = url
             added += 1
         }
-        saveImports()
-        AppLog.shared.info("Imported \(added) file(s)")
+        return (added, skipped)
     }
 
     static func readBook(_ url: URL) async throws -> Book {
@@ -115,8 +128,9 @@ extension LibraryModel {
         var chapters: [Chapter] = []
         for group in (try? await asset.loadChapterMetadataGroups(bestMatchingPreferredLanguages: Locale.preferredLanguages)) ?? [] {
             let title = try? await AVMetadataItem.metadataItems(from: group.items, filteredByIdentifier: .commonIdentifierTitle).first?.load(.stringValue)
-            chapters.append(Chapter(title: title ?? "Chapter \(chapters.count + 1)",
-                                    startMs: Int(group.timeRange.start.seconds * 1000), lengthMs: Int(group.timeRange.duration.seconds * 1000)))
+            guard let start = Chapter.millis(group.timeRange.start.seconds),
+                  let length = Chapter.millis(group.timeRange.duration.seconds) else { continue }
+            chapters.append(Chapter(title: title ?? "Chapter \(chapters.count + 1)", startMs: start, lengthMs: length))
         }
         let title = await value(.commonIdentifierTitle), album = await value(.commonIdentifierAlbumName)
         let artist = await value(.commonIdentifierArtist), author = await value(.commonIdentifierAuthor), genre = await value(.commonIdentifierType)
@@ -161,7 +175,12 @@ extension LibraryModel {
             let name = Book.fileName(url.deletingPathExtension().lastPathComponent, fallback: "Import")
             let target = Self.importsDirectory.appendingPathComponent("\(name)-\(UUID().uuidString.prefix(8)).\(ext)")
             try FileManager.default.moveItem(at: temporary, to: target)
-            try await importFiles([target])
+            do {
+                guard try await importFiles([target]).added == 1 else { throw AudibleError("The downloaded file could not be read as audio.") }
+            } catch {
+                try? FileManager.default.removeItem(at: target)
+                throw error
+            }
         }
     }
 
