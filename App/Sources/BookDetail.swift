@@ -137,6 +137,9 @@ struct PlayerBar: View {
             .padding(.horizontal, 16).padding(.vertical, 10)
             .glassEffect(.regular, in: .rect(cornerRadius: 16))
             .padding(12)
+            // Report no minimum width: the bar appearing must not raise the split view's detail-column min size,
+            // which AppKit applies mid constraint pass and crashes ("needs update constraints").
+            .frame(minWidth: 0, maxWidth: .infinity)
         }
     }
 }

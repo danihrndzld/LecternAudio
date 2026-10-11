@@ -13,6 +13,7 @@ Feature inventory of the old app: `docs/openaudible-spec.md`. Stack decision: `d
 - CI cannot log into Audible. Every network or crypto feature ships with offline tests: recorded JSON fixtures in `Tests/.../Fixtures`, known-answer crypto vectors. Fixtures never contain tokens, cookies, activation bytes, customer IDs or download links: redact them.
 - Secrets (tokens, device keys, activation bytes) live in Keychain only. Never log them.
 - Views inside `Table` rows and context menus must not read `@Environment` objects (they crashed: AppKit hosts them outside the window tree); pass dependencies in (see `Cover`, `BookActions`).
+- Views shown/hidden inside a `NavigationSplitView` column (player bar, banners) must not raise the column's minimum width: give them `.frame(minWidth: 0, maxWidth: .infinity)`. A growing min size is applied mid constraint pass and crashes AppKit. Reproduce with `EARMARK_PLAY=1` (plays the `EARMARK_SELECT` book).
 - Never use `NSAttributedString` HTML import; use `HTMLText.markdown`.
 - AAX → M4B conversion uses a bundled LGPL FFmpeg helper and user-supplied activation bytes stored only in Keychain. Account-driven key acquisition, downloads and AAXC support are pending, not implemented. Do not depend on OpenAudible's licensed key service. See the end-to-end workflow in `docs/aax-conversion.md`.
 - Derive Audible auth/library API from open sources: mkb79/audible (MIT), audible-cli. Do not copy GPL code (Libation).

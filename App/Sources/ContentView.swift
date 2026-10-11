@@ -14,20 +14,23 @@ struct ContentView: View {
             Sidebar()
                 .navigationSplitViewColumnWidth(min: 190, ideal: 220)
         } detail: {
-            Group {
-                if model.books.isEmpty {
-                    Onboarding()
-                } else if gridMode {
-                    LibraryGrid()
-                } else {
-                    LibraryTable()
+            // Player bar is stacked, not a safeAreaInset: inserting a bottom inset over the AppKit-backed
+            // Table changed safe-area insets mid-layout and crashed ("needs update constraints" exception).
+            VStack(spacing: 0) {
+                Group {
+                    if model.books.isEmpty {
+                        Onboarding()
+                    } else if gridMode {
+                        LibraryGrid()
+                    } else {
+                        LibraryTable()
+                    }
                 }
+                .frame(maxHeight: .infinity)
+                if player.book != nil { PlayerBar() }
             }
             .navigationTitle(model.filter.title)
             .navigationSubtitle(model.books.isEmpty ? "" : "\(model.visibleBooks.count) books")
-            .safeAreaInset(edge: .bottom) {
-                if player.book != nil { PlayerBar() }
-            }
         }
         .inspector(isPresented: $showInspector) {
             Group {
