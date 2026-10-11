@@ -98,8 +98,11 @@ public struct SignIn: Sendable {
         return c.url!
     }
 
-    /// True for the final redirect (`/ap/maplanding`); `authorizationCode(from:)` then holds the code, or nil if sign-in failed.
-    public static func isRedirect(_ url: URL) -> Bool { url.path.hasSuffix("/ap/maplanding") }
+    /// True for the final redirect, exactly `https://www.amazon.<domain>/ap/maplanding` for this marketplace;
+    /// `authorizationCode(from:)` then holds the code, or nil if sign-in failed.
+    public func isRedirect(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == "https" && url.host?.lowercased() == "www.amazon.\(marketplace.domain)" && url.path == "/ap/maplanding"
+    }
 
     public static func authorizationCode(from url: URL) -> String? {
         URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?

@@ -50,12 +50,25 @@ private func account(key: String = "") -> AudibleAccount {
 
 @Test func parsesRedirect() throws {
     let ok = try #require(URL(string: "https://www.amazon.com/ap/maplanding?openid.oa2.authorization_code=ANcode123&openid.mode=id_res"))
-    #expect(SignIn.isRedirect(ok))
+    #expect(fixedSignIn.isRedirect(ok))
     #expect(SignIn.authorizationCode(from: ok) == "ANcode123")
     let failed = try #require(URL(string: "https://www.amazon.com/ap/maplanding?openid.mode=cancel"))
-    #expect(SignIn.isRedirect(failed))
+    #expect(fixedSignIn.isRedirect(failed))
     #expect(SignIn.authorizationCode(from: failed) == nil)
-    #expect(!SignIn.isRedirect(fixedSignIn.url))
+    #expect(!fixedSignIn.isRedirect(fixedSignIn.url))
+}
+
+@Test func redirectRequiresMarketplaceSignInHost() throws {
+    for bad in ["https://evil.example/ap/maplanding?openid.oa2.authorization_code=x",
+                "https://www.amazon.com.evil.example/ap/maplanding",
+                "https://www.amazon.co.uk/ap/maplanding",
+                "http://www.amazon.com/ap/maplanding",
+                "https://www.amazon.com/x/ap/maplanding",
+                "https://www.amazon.com/ap/maplanding/x"] {
+        #expect(!fixedSignIn.isRedirect(try #require(URL(string: bad))), "\(bad)")
+    }
+    let uk = SignIn(marketplace: try #require(Marketplace.all.first { $0.code == "uk" }))
+    #expect(uk.isRedirect(try #require(URL(string: "https://www.amazon.co.uk/ap/maplanding?openid.mode=cancel"))))
 }
 
 @Test func registerBody() throws {

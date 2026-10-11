@@ -274,7 +274,7 @@ final class LibraryModel {
     /// Asks where to save, then converts the book's M4B to MP3 (bitrate and VBR from Settings) in the background.
     func exportMP3(_ book: Book, byChapter: Bool) {
         guard let source = m4bURL(for: book), exportTasks[book.id] == nil else { return }
-        let name = book.title.replacing(/[\/:]/, with: "-")
+        let name = Book.fileName(book.title, fallback: book.asin.isEmpty ? "Book" : book.asin)
         let destination: URL
         if byChapter {
             let panel = NSOpenPanel()

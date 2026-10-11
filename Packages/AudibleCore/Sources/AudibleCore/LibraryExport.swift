@@ -24,9 +24,11 @@ public enum LibraryExport {
     }
 
     /// RFC 4180: CRLF line ends; fields with commas, quotes or newlines are quoted.
+    /// Text starting with `= + - @`, tab or CR gets a leading `'` so spreadsheets don't run it as a formula.
     public static func csv(_ books: [Book]) -> Data {
-        func field(_ s: String) -> String {
-            s.contains(where: { ",\"\n\r".contains($0) }) ? "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : s
+        func field(_ raw: String) -> String {
+            let s = raw.unicodeScalars.first.map { "=+-@\t\r".unicodeScalars.contains($0) } == true ? "'" + raw : raw
+            return s.contains(where: { ",\"\n\r".contains($0) }) ? "\"" + s.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : s
         }
         let lines = [headers] + rows(books).map { $0.map(string) }
         return Data(lines.map { $0.map(field).joined(separator: ",") }.joined(separator: "\r\n").appending("\r\n").utf8)

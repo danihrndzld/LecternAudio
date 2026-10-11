@@ -145,14 +145,21 @@ extension LibraryModel {
         runJob("Import URL") { [self] in
             let (temporary, response) = try await URLSession.shared.download(from: url)
             defer { try? FileManager.default.removeItem(at: temporary) }
-            let ext = url.pathExtension.lowercased()
+            // The saved file's extension always comes from this allowlist: the URL's own, else one implied by the MIME type.
+            let mime: String? = switch response.mimeType?.lowercased() {
+            case "audio/mpeg", "audio/mp3": "mp3"
+            case "audio/mp4", "audio/x-m4a", "audio/m4a": "m4a"
+            case "audio/x-m4b", "audio/m4b": "m4b"
+            default: nil
+            }
+            let urlExt = url.pathExtension.lowercased()
             guard (response as? HTTPURLResponse)?.statusCode == 200,
-                  response.mimeType?.hasPrefix("audio/") == true || ["m4b", "m4a", "mp3"].contains(ext) else {
-                throw AudibleError("That link did not return an audio file.")
+                  let ext = ["m4b", "m4a", "mp3"].contains(urlExt) ? urlExt : mime else {
+                throw AudibleError("That link did not return an .m4b, .m4a or .mp3 file.")
             }
             try FileManager.default.createDirectory(at: Self.importsDirectory, withIntermediateDirectories: true)
-            let name = url.deletingPathExtension().lastPathComponent.replacing(/[\/:]/, with: "-")
-            let target = Self.importsDirectory.appendingPathComponent("\(name)-\(UUID().uuidString.prefix(8)).\(ext.isEmpty ? "m4a" : ext)")
+            let name = Book.fileName(url.deletingPathExtension().lastPathComponent, fallback: "Import")
+            let target = Self.importsDirectory.appendingPathComponent("\(name)-\(UUID().uuidString.prefix(8)).\(ext)")
             try FileManager.default.moveItem(at: temporary, to: target)
             try await importFiles([target])
         }

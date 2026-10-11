@@ -145,7 +145,7 @@ struct SignInView: View {
             if registering {
                 ProgressView("Registering Earmark with Audible…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let signIn {
-                AmazonWebView(url: signIn.url) { redirect in
+                AmazonWebView(signIn: signIn) { redirect in
                     registering = true
                     Task {
                         await session.register(signIn, redirect: redirect)
@@ -183,10 +183,10 @@ struct SignInView: View {
 }
 
 private struct AmazonWebView: NSViewRepresentable {
-    let url: URL
+    let signIn: SignIn
     let onRedirect: (URL) -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onRedirect: onRedirect) }
+    func makeCoordinator() -> Coordinator { Coordinator(signIn: signIn, onRedirect: onRedirect) }
 
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -194,18 +194,19 @@ private struct AmazonWebView: NSViewRepresentable {
         let view = WKWebView(frame: .zero, configuration: config)
         view.customUserAgent = SignIn.userAgent
         view.navigationDelegate = context.coordinator
-        view.load(URLRequest(url: url))
+        view.load(URLRequest(url: signIn.url))
         return view
     }
 
     func updateNSView(_ view: WKWebView, context: Context) {}
 
     final class Coordinator: NSObject, WKNavigationDelegate {
+        let signIn: SignIn
         let onRedirect: (URL) -> Void
-        init(onRedirect: @escaping (URL) -> Void) { self.onRedirect = onRedirect }
+        init(signIn: SignIn, onRedirect: @escaping (URL) -> Void) { self.signIn = signIn; self.onRedirect = onRedirect }
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
-            guard let url = action.request.url, SignIn.isRedirect(url) else { return .allow }
+            guard let url = action.request.url, signIn.isRedirect(url) else { return .allow }
             onRedirect(url)
             return .cancel
         }

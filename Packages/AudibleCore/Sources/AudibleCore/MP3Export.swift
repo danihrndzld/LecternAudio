@@ -86,7 +86,7 @@ public enum MP3Export {
                 t.title = c.title
                 t.track = "\(i + 1)/\(tag.chapters.count)"
                 t.chapters = []
-                let name = String(format: "%0\(digits)d - ", i + 1) + c.title.replacing(/[\/:]/, with: "-") + ".mp3"
+                let name = String(format: "%0\(digits)d - ", i + 1) + Book.fileName(c.title, fallback: "Chapter") + ".mp3"
                 let range = CMTimeRange(start: CMTime(value: Int64(c.startMs), timescale: 1000),
                                         duration: CMTime(value: Int64(c.lengthMs), timescale: 1000))
                 try encode(range, t, to: destination.appendingPathComponent(name)) { p in

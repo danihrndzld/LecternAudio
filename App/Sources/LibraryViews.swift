@@ -150,7 +150,7 @@ struct BookActions: View {
             Button("Export MP3…", systemImage: "square.and.arrow.up") { model.exportMP3(book, byChapter: false) }
             Button("Export MP3 by Chapter…", systemImage: "square.and.arrow.up.on.square") { model.exportMP3(book, byChapter: true) }
         }
-        if let pdf = model.library?.pdfURL(for: book) {
+        if let pdf = model.library?.pdfURL(for: book), pdf.pathExtension.lowercased() == "pdf" {
             Button("Open PDF", systemImage: "doc.richtext") { NSWorkspace.shared.open(pdf) }
         }
         if !book.asin.isEmpty, let web = URL(string: "https://www.audible.com/pd/\(book.asin)") {

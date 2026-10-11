@@ -33,4 +33,4 @@ open -n -W --env EARMARK_LIBRARY=<OpenAudible folder> --env EARMARK_SELECT=<asin
 The sidebar renders black in snapshots (vibrancy isn't captured by `cacheDisplay`); that is expected.
 
 ## Workflow
-Issues labeled `agent` are implemented by `.github/workflows/claude.yml`. CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green. Add the label `hold` to a PR to stop the merge. Nobody reviews code, so the tests are the review.
+Issues labeled `agent` are implemented by `.github/workflows/claude.yml`. CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green. Add the label `hold` to a PR to stop the merge. PRs that change files under `.github/` are never automerged; merge them by hand. Nobody reviews code, so the tests are the review.

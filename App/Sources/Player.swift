@@ -45,7 +45,11 @@ final class Player {
     var currentChapter: Chapter? { book?.chapters.last { $0.start <= time } }
 
     func play(_ book: Book, url: URL) {
-        if UserDefaults.standard.bool(forKey: Prefs.externalPlayer) { return Prefs.open(url, appKey: Prefs.playerApp) }
+        if UserDefaults.standard.bool(forKey: Prefs.externalPlayer) {
+            // Never hand a non-audio file (say a `.command` named in books.json) to Launch Services.
+            guard ["m4b", "m4a", "mp3", "aax", "aaxc"].contains(url.pathExtension.lowercased()) else { return }
+            return Prefs.open(url, appKey: Prefs.playerApp)
+        }
         savePosition()
         self.book = book
         avPlayer.replaceCurrentItem(with: AVPlayerItem(url: url))

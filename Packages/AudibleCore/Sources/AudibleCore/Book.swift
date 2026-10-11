@@ -147,3 +147,13 @@ extension Book {
                   region: "", readStatus: nil, imageURL: imageURL, chapters: chapters, files: files)
     }
 }
+
+extension Book {
+    /// `title` as one safe path component: `/`, `:` become `-`, control characters are dropped,
+    /// and an empty, `.`, `..` or hidden (leading `.`) result becomes `fallback`.
+    public static func fileName(_ title: String, fallback: String) -> String {
+        let name = String(String.UnicodeScalarView(title.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }))
+            .replacing(/[\/:]/, with: "-").trimmingCharacters(in: .whitespaces)
+        return name.isEmpty || name.hasPrefix(".") ? fallback : name
+    }
+}
