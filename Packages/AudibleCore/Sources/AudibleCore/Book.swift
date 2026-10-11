@@ -7,6 +7,12 @@ public struct Chapter: Codable, Hashable, Sendable {
 
     public var start: TimeInterval { Double(startMs) / 1000 }
 
+    public init(title: String, startMs: Int, lengthMs: Int) {
+        self.title = title
+        self.startMs = startMs
+        self.lengthMs = lengthMs
+    }
+
     enum CodingKeys: String, CodingKey {
         case title
         case startMs = "start_offset_ms"
