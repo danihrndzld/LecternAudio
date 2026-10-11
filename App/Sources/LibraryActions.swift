@@ -97,7 +97,7 @@ extension LibraryModel {
         AppLog.shared.info("Imported \(added) file(s)")
     }
 
-    private static func readBook(_ url: URL) async throws -> Book {
+    static func readBook(_ url: URL) async throws -> Book {
         let asset = AVURLAsset(url: url)
         let duration = try await asset.load(.duration).seconds
         let metadata = try await asset.load(.commonMetadata)
@@ -190,33 +190,37 @@ extension LibraryModel {
         panel.nameFieldStringValue = "Earmark Covers.png"
         guard panel.runModal() == .OK, let out = panel.url else { return }
         // ponytail: first 400 covers (a 20×20 grid, 4000 px); tile smaller if bigger posters are wanted.
-        let urls = visibleBooks.prefix(400).compactMap(artURL(for:))
-        runJob("Cover poster") {
-            var images: [NSImage] = []
-            for url in urls {
-                try Task.checkCancellation()
-                let data = url.isFileURL ? try? Data(contentsOf: url) : try? await URLSession.shared.data(from: url).0
-                if let data, let image = NSImage(data: data) { images.append(image) }
-            }
-            guard !images.isEmpty else { throw AudibleError("None of these books has a cover image.") }
-            let columns = Int(Double(images.count).squareRoot().rounded(.up))
-            let grid = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
-                ForEach(Array(stride(from: 0, to: images.count, by: columns)), id: \.self) { start in
-                    GridRow {
-                        ForEach(start..<min(start + columns, images.count), id: \.self) { i in
-                            Image(nsImage: images[i]).resizable().scaledToFill().frame(width: 200, height: 200).clipped()
-                        }
+        let urls = visibleBooks.prefix(400).compactMap { b in
+            artURL(for: b).flatMap { $0.isFileURL && !FileManager.default.fileExists(atPath: $0.path) ? nil : $0 } ?? b.imageURL
+        }
+        runJob("Cover poster") { try await Self.renderPoster(urls).write(to: out, options: .atomic) }
+    }
+
+    static func renderPoster(_ urls: [URL]) async throws -> Data {
+        var images: [NSImage] = []
+        for url in urls {
+            try Task.checkCancellation()
+            let data = url.isFileURL ? try? Data(contentsOf: url) : try? await URLSession.shared.data(from: url).0
+            if let data, let image = NSImage(data: data) { images.append(image) }
+        }
+        guard !images.isEmpty else { throw AudibleError("None of these books has a cover image.") }
+        let columns = Int(Double(images.count).squareRoot().rounded(.up))
+        let grid = Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+            ForEach(Array(stride(from: 0, to: images.count, by: columns)), id: \.self) { start in
+                GridRow {
+                    ForEach(start..<min(start + columns, images.count), id: \.self) { i in
+                        Image(nsImage: images[i]).resizable().scaledToFill().frame(width: 200, height: 200).clipped()
                     }
                 }
             }
-            .background(.black)
-            let renderer = ImageRenderer(content: grid)
-            guard let cg = renderer.cgImage,
-                  let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else {
-                throw AudibleError("Could not render the poster.")
-            }
-            try png.write(to: out, options: .atomic)
         }
+        .background(.black)
+        let renderer = ImageRenderer(content: grid)
+        guard let cg = renderer.cgImage,
+              let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else {
+            throw AudibleError("Could not render the poster.")
+        }
+        return png
     }
 
     // MARK: Join
@@ -234,24 +238,26 @@ extension LibraryModel {
         save.allowedContentTypes = [UTType(filenameExtension: "m4b") ?? .mpeg4Audio, .mpeg4Audio]
         save.nameFieldStringValue = inputs[0].deletingPathExtension().lastPathComponent + " (Joined).m4b"
         guard save.runModal() == .OK, let out = save.url else { return }
-        runJob("Join \(inputs.count) files") {
-            let composition = AVMutableComposition()
-            guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return }
-            var cursor = CMTime.zero
-            for url in inputs {
-                let asset = AVURLAsset(url: url)
-                guard let source = try await asset.loadTracks(withMediaType: .audio).first else {
-                    throw AudibleError("\(url.lastPathComponent) has no audio.")
-                }
-                let duration = try await asset.load(.duration)
-                try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: source, at: cursor)
-                cursor = cursor + duration
+        runJob("Join \(inputs.count) files") { try await Self.join(inputs, to: out) }
+    }
+
+    static func join(_ inputs: [URL], to out: URL) async throws {
+        let composition = AVMutableComposition()
+        guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return }
+        var cursor = CMTime.zero
+        for url in inputs {
+            let asset = AVURLAsset(url: url)
+            guard let source = try await asset.loadTracks(withMediaType: .audio).first else {
+                throw AudibleError("\(url.lastPathComponent) has no audio.")
             }
-            guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
-                throw AudibleError("This Mac cannot export AAC audio.")
-            }
-            try? FileManager.default.removeItem(at: out)  // the save panel already confirmed replacing it
-            try await session.export(to: out, as: .m4a)
+            let duration = try await asset.load(.duration)
+            try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: source, at: cursor)
+            cursor = cursor + duration
         }
+        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else {
+            throw AudibleError("This Mac cannot export AAC audio.")
+        }
+        try? FileManager.default.removeItem(at: out)  // the save panel already confirmed replacing it
+        try await session.export(to: out, as: .m4a)
     }
 }

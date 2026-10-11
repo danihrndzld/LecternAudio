@@ -242,7 +242,6 @@ private struct ViewCommands: Commands {
                 library.sortOrder = BookComparator.defaultOrder
                 fontSize = .medium
             }
-            Divider()
         }
     }
 
