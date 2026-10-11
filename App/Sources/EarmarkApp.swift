@@ -18,6 +18,11 @@ struct EarmarkApp: App {
                     if ProcessInfo.processInfo.environment["EARMARK_CONVERSION_PREVIEW"] == "1", let book = library.selectedBook {
                         library.conversion.book = book
                     }
+                    // EARMARK_PLAY=1 plays the selected book, to reproduce player-bar layout issues.
+                    if ProcessInfo.processInfo.environment["EARMARK_PLAY"] == "1", let book = library.selectedBook,
+                       let url = library.library?.audioURL(for: book) {
+                        player.play(book, url: url)
+                    }
                     await debugSnapshot()
                 }
                 #endif
