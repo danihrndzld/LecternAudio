@@ -6,7 +6,7 @@ Status: accepted 2026-10-11. The memo below was written by an advisor model (Fab
 - No release, notarization or Sparkle pipeline yet: the only signing identity available is Apple Development (no Developer ID). Add it when a Developer ID exists.
 - GRDB is deferred until Earmark owns its own library store (sync issue). v0.1 reads OpenAudible's `books.json` directly.
 - macOS CI minutes are billed on private repos; the core suite also runs on Linux to keep feedback cheap.
-- Activation bytes: OpenAudible fetches them from its own server (see spec §4). Earmark gets them from Audible's `/license/token` flow as mkb79/audible does, and prefers AAXC (key+iv from the license voucher).
+- DRM is out of scope (amended 2026-10-11): no activation-bytes recovery, voucher decryption or AAX/AAXC decryption. The memo's decrypt section below is superseded. Earmark manages, plays and exports already-decrypted files.
 
 ---
 
