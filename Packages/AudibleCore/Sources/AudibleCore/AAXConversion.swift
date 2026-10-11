@@ -19,6 +19,7 @@ public struct ActivationBytes: Sendable, CustomStringConvertible, CustomDebugStr
 
     public var description: String { "<activation bytes>" }
     public var debugDescription: String { description }
+    public var keychainValue: String { hex }
 }
 
 public enum ConversionError: Error, LocalizedError, Equatable {
@@ -27,7 +28,7 @@ public enum ConversionError: Error, LocalizedError, Equatable {
     public var errorDescription: String? {
         switch self {
         case .invalidActivationBytes: "Enter the eight hexadecimal characters of your Audible activation bytes."
-        case .invalidInput: "The AAX file is missing or unreadable. AAXC requires a different key and is not supported yet."
+        case .invalidInput: "The encrypted audiobook is missing, unreadable or does not match its credentials."
         case .outputExists: "The destination already exists. Choose a different output file."
         case .ffmpegUnavailable: "FFmpeg could not start. Check that the conversion tool is installed and executable."
         case .conversionFailed: "Conversion failed. Check the activation bytes, source file, free disk space and FFmpeg installation."
@@ -81,8 +82,11 @@ public struct AAXConversionRequest: Sendable {
     }
 
     func arguments(key: ActivationBytes, metadataURL: URL, temporaryOutput: URL) -> [String] {
-        var args = ["-hide_banner", "-nostdin", "-loglevel", "error", "-xerror", "-n",
-                    "-activation_bytes", key.hex, "-i", input.path,
+        arguments(credentials: .aax(key), metadataURL: metadataURL, temporaryOutput: temporaryOutput)
+    }
+
+    func arguments(credentials: ContentCredentials, metadataURL: URL, temporaryOutput: URL) -> [String] {
+        var args = ["-hide_banner", "-nostdin", "-loglevel", "error", "-xerror", "-n"] + credentials.arguments + ["-i", input.path,
                     "-f", "ffmetadata", "-i", metadataURL.path]
         if let cover { args += ["-i", cover.path] }
         args += ["-map", "0:a:0", "-c:a", "copy", "-map", cover == nil ? "0:v:0?" : "2:v:0",
@@ -105,12 +109,17 @@ public actor AAXConverter {
 
     public func convert(_ request: AAXConversionRequest, activationBytes: ActivationBytes, ffmpeg: URL,
                         progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> URL {
+        try await convert(request, credentials: .aax(activationBytes), ffmpeg: ffmpeg, progress: progress)
+    }
+
+    public func convert(_ request: AAXConversionRequest, credentials: ContentCredentials, ffmpeg: URL,
+                        progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> URL {
         guard !running else { throw ConversionError.busy }
         running = true
         defer { running = false }
         try Task.checkCancellation()
         let manager = FileManager.default
-        guard request.input.isFileURL, request.input.pathExtension.lowercased() == "aax",
+        guard request.input.isFileURL, request.input.pathExtension.lowercased() == credentials.fileExtension,
               manager.isReadableFile(atPath: request.input.path), request.output.isFileURL,
               request.output.pathExtension.lowercased() == "m4b" else { throw ConversionError.invalidInput }
         guard !manager.fileExists(atPath: request.output.path) else { throw ConversionError.outputExists }
@@ -123,19 +132,26 @@ public actor AAXConverter {
         let metadata = working.appendingPathComponent("chapters.txt")
         let output = working.appendingPathComponent("output.m4b")
         try request.metadata.write(to: metadata, atomically: true, encoding: .utf8)
-        let status = try await run(ffmpeg, arguments: request.arguments(key: activationBytes, metadataURL: metadata, temporaryOutput: output),
+        let status = try await run(ffmpeg, arguments: request.arguments(credentials: credentials, metadataURL: metadata, temporaryOutput: output),
                                    duration: request.book.seconds, progress: progress)
         guard status == 0 else { throw ConversionError.conversionFailed }
         guard let size = try output.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 0 else {
             throw ConversionError.invalidOutput
         }
-        let validation = try await run(ffmpeg, arguments: ["-hide_banner", "-nostdin", "-v", "error", "-xerror",
-            "-i", output.path, "-map", "0:a:0", "-t", "1", "-f", "null", "-"], duration: 0, progress: { _ in })
-        guard validation == 0 else { throw ConversionError.invalidOutput }
+        try await validate(output, ffmpeg: ffmpeg)
         try Task.checkCancellation()
         try manager.moveItem(at: output, to: request.output)
         progress(1)
         return request.output
+    }
+
+    public func validate(_ output: URL, ffmpeg: URL) async throws {
+        guard output.isFileURL, let size = try? output.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 0 else {
+            throw ConversionError.invalidOutput
+        }
+        let validation = try await run(ffmpeg, arguments: ["-hide_banner", "-nostdin", "-v", "error", "-xerror",
+            "-i", output.path, "-map", "0:a:0", "-t", "1", "-f", "null", "-"], duration: 0, progress: { _ in })
+        guard validation == 0 else { throw ConversionError.invalidOutput }
     }
 
     private func run(_ executable: URL, arguments: [String], duration: Int,

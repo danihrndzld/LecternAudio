@@ -48,7 +48,7 @@ struct LibraryTable: View {
     }
 
     private func play(_ b: Book) {
-        if let url = model.library?.audioURL(for: b) { player.play(b, url: url) }
+        if let url = model.audioURL(for: b) { player.play(b, url: url) }
     }
 }
 
@@ -74,7 +74,7 @@ struct LibraryGrid: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture(count: 2) {
-                        if let url = model.library?.audioURL(for: b) { player.play(b, url: url) }
+                        if let url = model.audioURL(for: b) { player.play(b, url: url) }
                     }
                     .onTapGesture { model.selection = [b.id] }
                     .contextMenu { BookActions(book: b, model: model, player: player) }
@@ -126,13 +126,16 @@ struct BookActions: View {
     let player: Player
 
     var body: some View {
-        if let url = model.library?.audioURL(for: book) {
+        if let url = model.audioURL(for: book) {
             Button("Play", systemImage: "play.fill") { player.play(book, url: url) }
             Button("Show in Finder", systemImage: "folder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
         }
         if model.library?.aaxURL(for: book) != nil {
-            Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.conversion.prepare(book) }
+            Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.convert(book) }
                 .disabled(model.conversion.isRunning)
+        }
+        if model.canDownload(book) {
+            Button("Download and Convert", systemImage: "arrow.down.circle") { model.downloads.enqueue([book]) }
         }
         if model.exports[book.id] != nil {
             Button("Cancel MP3 Export", systemImage: "xmark.circle") { model.cancelExport(book.id) }

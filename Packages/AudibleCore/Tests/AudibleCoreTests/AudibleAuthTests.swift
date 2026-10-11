@@ -123,7 +123,7 @@ private func account(key: String = "") -> AudibleAccount {
 @Test func deregisterRequest() throws {
     let r = account().deregisterRequest()
     #expect(r.url?.absoluteString == "https://api.amazon.com/auth/deregister")
-    #expect(r.value(forHTTPHeaderField: "Authorization") == "Bearer Atna|A")
+    #expect(r.value(forHTTPHeaderField: "x-amz-access-token") == "Atna|A")
     #expect(String(decoding: try #require(r.httpBody), as: UTF8.self) == #"{"deregister_all_existing_accounts":false}"#)
 }
 

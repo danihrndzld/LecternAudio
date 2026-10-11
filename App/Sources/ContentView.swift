@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(Player.self) private var player
     @AppStorage("viewMode") private var gridMode = false
     @State private var showInspector = true
+    @State private var showDownloads = false
 
     var body: some View {
         @Bindable var model = model
@@ -45,6 +46,10 @@ struct ContentView: View {
         .searchable(text: $model.search, prompt: "Title, author, narrator")
         .toolbar {
             ToolbarItem {
+                Button("Downloads", systemImage: "arrow.down.circle") { showDownloads = true }
+                    .help("Download queue (\(model.downloads.pendingCount) pending)")
+            }
+            ToolbarItem {
                 Picker("View", selection: $gridMode) {
                     Label("List", systemImage: "list.bullet").tag(false)
                     Label("Covers", systemImage: "square.grid.2x2").tag(true)
@@ -62,7 +67,23 @@ struct ContentView: View {
                 Button("Info", systemImage: "info.circle") { showInspector.toggle() }
             }
         }
-        .onChange(of: session.account == nil, initial: true) { _, signedOut in model.useAudible(!signedOut) }
+        .onChange(of: session.account?.storageID, initial: true) { _, _ in model.useAudible(session) }
+        .task(id: session.account?.deviceSerial) {
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["EARMARK_DOWNLOADS_PREVIEW"] == "1" { showDownloads = true }
+            #endif
+            guard session.account != nil else { return }
+            do {
+                let account = try await session.currentAccount()
+                try Task.checkCancellation()
+                model.useAudible(session)
+                model.sync(account)
+            } catch is CancellationError {
+            } catch {
+                session.error = "Could not restore the session. Open Account Settings to sign in again."
+            }
+        }
+        .sheet(isPresented: $showDownloads) { DownloadsView(downloads: model.downloads, library: model) }
         .alert("Sync failed", isPresented: Binding { model.syncError != nil } set: { if !$0 { model.syncError = nil } }) {
             Button("OK") {}
         } message: {

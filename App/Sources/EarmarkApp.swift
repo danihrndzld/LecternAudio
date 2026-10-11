@@ -46,9 +46,13 @@ struct EarmarkApp: App {
             }
             CommandMenu("Conversion") {
                 Button("Convert Selected Book to M4B…") {
-                    if let book = library.selectedBook { library.conversion.prepare(book) }
+                    if let book = library.selectedBook { library.convert(book) }
                 }
                 .disabled(library.selectedBook.flatMap { library.library?.aaxURL(for: $0) } == nil || library.conversion.isRunning)
+                Button("Download and Convert Selected Books") {
+                    library.downloads.enqueue(library.books.filter { library.selection.contains($0.id) })
+                }
+                .disabled(!library.books.contains { library.selection.contains($0.id) && library.canDownload($0) })
             }
         }
 
@@ -75,7 +79,8 @@ struct EarmarkApp: App {
     guard let window = NSApp.windows.first else { print("snapshot: no window", NSApp.windows); return }
     window.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
     try? await Task.sleep(for: .seconds(3))
-    let target = env["EARMARK_CONVERSION_PREVIEW"] == "1" ? (window.attachedSheet ?? window) : window
+    let previewSheet = env["EARMARK_CONVERSION_PREVIEW"] == "1" || env["EARMARK_DOWNLOADS_PREVIEW"] == "1"
+    let target = previewSheet ? (window.attachedSheet ?? window) : window
     guard let view = target.contentView?.superview else { return }
     guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
     view.cacheDisplay(in: view.bounds, to: rep)

@@ -16,7 +16,7 @@ struct BookDetail: View {
                     Text(book.author).font(.headline).foregroundStyle(.secondary)
                 }
 
-                if let url = model.library?.audioURL(for: book) {
+                if let url = model.audioURL(for: book) {
                     Button { player.play(book, url: url) } label: {
                         Label("Play", systemImage: "play.fill").frame(maxWidth: .infinity)
                     }
@@ -40,8 +40,16 @@ struct BookDetail: View {
                 }
 
                 if model.library?.aaxURL(for: book) != nil {
-                    Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.conversion.prepare(book) }
+                    Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.convert(book) }
                         .disabled(model.conversion.isRunning)
+                }
+
+                if model.canDownload(book) {
+                    Button("Download and Convert", systemImage: "arrow.down.circle") { model.downloads.enqueue([book]) }
+                        .disabled(model.downloads.jobs.contains { $0.id == book.id && [.queued, .licensing, .downloading, .converting].contains($0.state) })
+                    if let job = model.downloads.jobs.first(where: { $0.id == book.id }) {
+                        Text(job.message ?? job.state.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
 
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
@@ -75,7 +83,7 @@ struct BookDetail: View {
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 if player.book?.id == book.id { player.seek(to: c.start) }
-                                else if let url = model.library?.audioURL(for: book) {
+                                else if let url = model.audioURL(for: book) {
                                     player.play(book, url: url)
                                     player.seek(to: c.start)
                                 }

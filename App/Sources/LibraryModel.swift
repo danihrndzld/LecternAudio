@@ -53,6 +53,13 @@ final class LibraryModel {
     var selection: Set<Book.ID> = []
     var isPickingFolder = false
     let conversion = ConversionModel()
+    let downloads = DownloadModel()
+    private var accountRoot: URL?
+    private var downloadedLibrary: OpenAudibleLibrary?
+    private var syncTask: Task<Void, Never>?
+    private var syncGeneration = UUID()
+    private var accountIdentity: String?
+    private weak var session: AudibleSession?
     /// Progress (0...1) of running MP3 exports.
     private(set) var exports: [Book.ID: Double] = [:]
     @ObservationIgnored private var exportTasks: [Book.ID: Task<Void, Never>] = [:]
@@ -61,39 +68,91 @@ final class LibraryModel {
 
     init() { restore() }
 
-    private static let store = URL.applicationSupportDirectory.appending(path: "Earmark/library.json")
+    private var store: URL? { accountRoot?.appendingPathComponent("catalog.json") }
 
-    private func merge() { books = AudibleLibrary.merge(audible: audibleBooks, local: library?.books ?? []) }
+    private func merge() {
+        let local = AudibleLibrary.merge(audible: library?.books ?? [], local: downloadedLibrary?.books ?? [])
+        books = AudibleLibrary.merge(audible: audibleBooks, local: local)
+    }
 
     /// Signed out, the app shows only the OpenAudible folder, as before sign-in existed.
-    func useAudible(_ signedIn: Bool) {
-        if signedIn {
-            if audibleBooks.isEmpty { audibleBooks = AudibleLibrary.load(from: Self.store) }
-        } else {
-            audibleBooks = []
-            lastSync = nil
-            try? FileManager.default.removeItem(at: Self.store)
-        }
+    func useAudible(_ session: AudibleSession) {
+        self.session = session
+        let identity = session.account?.storageID
+        guard identity != accountIdentity || accountRoot == nil else { return }
+        syncTask?.cancel()
+        syncGeneration = UUID()
+        syncTask = nil
+        isSyncing = false
+        accountIdentity = identity
+        accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Earmark/accounts/\($0)") }
+        downloadedLibrary = accountRoot.flatMap { try? OpenAudibleLibrary(root: $0) }
+        audibleBooks = store.map { AudibleLibrary.load(from: $0) } ?? []
+        lastSync = nil
+        downloads.configure(session: session, library: self, root: accountRoot)
+        if identity == nil { conversion.cancel() }
+        merge()
     }
 
     func sync(_ account: AudibleAccount) {
-        guard !isSyncing else { return }
+        guard !isSyncing, account.storageID == accountIdentity, let store else { return }
         isSyncing = true
         syncedCount = 0
-        Task {
+        let generation = UUID()
+        syncGeneration = generation
+        syncTask = Task {
             do {
-                let fetched = try await AudibleLibrary.fetch(account: account, send: { try await URLSession.shared.data(for: $0) }) { n in
-                    Task { @MainActor in self.syncedCount = n }
+                let fetched = try await AudibleLibrary.fetch(account: account, send: { try await AudibleHTTP.data(for: $0) }) { n in
+                    Task { @MainActor in if self.syncGeneration == generation { self.syncedCount = n } }
                 }
-                try AudibleLibrary.save(fetched, to: Self.store)
+                try Task.checkCancellation()
+                guard accountIdentity == account.storageID, syncGeneration == generation else { return }
+                try AudibleLibrary.save(fetched, to: store)
                 audibleBooks = fetched
                 lastSync = .now
+                if downloads.automaticallyDownload { downloads.enqueue(books) }
             } catch is CancellationError {
             } catch {
-                syncError = error.localizedDescription
+                if syncGeneration == generation { syncError = error.localizedDescription }
             }
-            isSyncing = false
+            if syncGeneration == generation { isSyncing = false; syncTask = nil }
         }
+    }
+
+    func canDownload(_ book: Book) -> Bool {
+        accountIdentity != nil && audibleBooks.contains { $0.asin == book.asin } && !book.hasAudio
+    }
+
+    func convert(_ book: Book) {
+        if let session, session.account != nil, audibleBooks.contains(where: { $0.asin == book.asin }) {
+            conversion.prepare(book, session: session, library: self)
+        } else { conversion.prepare(book) }
+    }
+
+    func audioURL(for book: Book) -> URL? {
+        if let owned = downloadedLibrary?.books.first(where: { $0.id == book.id }),
+           let url = downloadedLibrary?.audioURL(for: owned) { return url }
+        return library?.audioURL(for: book)
+    }
+
+    func recordDownload(_ book: Book, output: URL, root: URL) throws {
+        guard root == accountRoot else { throw CancellationError() }
+        guard AudibleContent.validASIN(book.asin), output.standardizedFileURL == root.appendingPathComponent("books/\(book.asin).m4b").standardizedFileURL,
+              FileManager.default.isReadableFile(atPath: output.path) else { throw ConversionError.invalidOutput }
+        let index = root.appendingPathComponent("books.json")
+        var saved = FileManager.default.fileExists(atPath: index.path)
+            ? try JSONDecoder().decode([Book].self, from: Data(contentsOf: index)) : []
+        var local = book
+        local.files = [BookFile(path: output.lastPathComponent, type: .m4b)]
+        for suffix in ["jpg", "png"] {
+            let art = root.appendingPathComponent("art/\(book.asin).\(suffix)")
+            if FileManager.default.fileExists(atPath: art.path) { local.imageURL = art; break }
+        }
+        saved.removeAll { $0.id == book.id }
+        saved.append(local)
+        try AudibleLibrary.save(saved, to: root.appendingPathComponent("books.json"))
+        downloadedLibrary = try OpenAudibleLibrary(root: root)
+        merge()
     }
 
     /// Local cover when the folder has one, else Audible's CDN image.
@@ -144,12 +203,14 @@ final class LibraryModel {
     }
 
     func m4bURL(for book: Book) -> URL? {
-        book.files.first { $0.type == .m4b }.flatMap { library?.url(for: $0) }
+        if let owned = downloadedLibrary?.books.first(where: { $0.id == book.id }),
+           let file = owned.files.first(where: { $0.type == .m4b }) { return downloadedLibrary?.url(for: file) }
+        return book.files.first { $0.type == .m4b }.flatMap { library?.url(for: $0) }
     }
 
     /// Asks where to save, then converts the book's M4B to MP3 (64 kbps CBR mono) in the background.
     func exportMP3(_ book: Book, byChapter: Bool) {
-        guard let source = m4bURL(for: book), let library, exportTasks[book.id] == nil else { return }
+        guard let source = m4bURL(for: book), exportTasks[book.id] == nil else { return }
         let name = book.title.replacing(/[\/:]/, with: "-")
         let destination: URL
         if byChapter {
@@ -177,7 +238,7 @@ final class LibraryModel {
         tag.genre = book.primaryGenre
         tag.year = book.releaseDate.map { String(Calendar.current.component(.year, from: $0)) } ?? ""
         tag.comment = HTMLText.markdown(book.summary)
-        tag.cover = library.artURL(for: book).flatMap { try? Data(contentsOf: $0) }
+        tag.cover = library?.artURL(for: book).flatMap { try? Data(contentsOf: $0) }
         var options = MP3Export.Options()
         options.splitChapters = byChapter
 
