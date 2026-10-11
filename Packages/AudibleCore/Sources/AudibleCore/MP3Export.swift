@@ -105,8 +105,9 @@ public enum MP3Export {
         for group in try await asset.loadChapterMetadataGroups(withTitleLocale: locale, containingItemsWithCommonKeys: []) {
             let item = AVMetadataItem.metadataItems(from: group.items, filteredByIdentifier: .commonIdentifierTitle).first
             let title = try await item?.load(.stringValue) ?? ""
-            out.append(Chapter(title: title, startMs: Int((group.timeRange.start.seconds * 1000).rounded()),
-                               lengthMs: Int((group.timeRange.duration.seconds * 1000).rounded())))
+            guard let start = Chapter.millis(group.timeRange.start.seconds),
+                  let length = Chapter.millis(group.timeRange.duration.seconds) else { continue }
+            out.append(Chapter(title: title, startMs: start, lengthMs: length))
         }
         return out
     }

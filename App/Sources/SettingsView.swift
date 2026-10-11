@@ -20,14 +20,12 @@ enum Prefs {
     static let playerApp = "playerApp"
     static let browserApp = "browserApp"
     static let fileManagerApp = "fileManagerApp"
-    static let maxDownloads = "maxDownloads"
-    static let maxConversions = "maxConversions"
 
     /// Defaults for non-view readers; the `@AppStorage` declarations below repeat the same values.
     static func register() {
         UserDefaults.standard.register(defaults: [
             outputFormat: "m4b", mp3Bitrate: 64, refreshOnLaunch: true, autoSync: true, autoSyncHours: 24,
-            appearance: "system", tableFontSize: "medium", maxDownloads: 3, maxConversions: 3,
+            appearance: "system", tableFontSize: "medium",
         ])
     }
 
@@ -154,8 +152,6 @@ private struct GeneralSettings: View {
 
 private struct AdvancedSettings: View {
     @AppStorage(Prefs.externalPlayer) private var externalPlayer = false
-    @AppStorage(Prefs.maxDownloads) private var maxDownloads = 3
-    @AppStorage(Prefs.maxConversions) private var maxConversions = 3
 
     var body: some View {
         Form {
@@ -164,15 +160,6 @@ private struct AdvancedSettings: View {
                 AppPicker(title: "Audio player", key: Prefs.playerApp)
                 AppPicker(title: "Web browser", key: Prefs.browserApp)
                 AppPicker(title: "File manager", key: Prefs.fileManagerApp)
-            }
-            Section {
-                Stepper("Simultaneous downloads: \(maxDownloads)", value: $maxDownloads, in: 1...10)
-                Stepper("Simultaneous conversions: \(maxConversions)", value: $maxConversions, in: 1...10)
-            } header: {
-                Text("Concurrent Jobs")
-            } footer: {
-                Text("Earmark runs one download and one conversion at a time today; these limits apply once jobs run in parallel.")
-                    .font(.callout).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

@@ -102,16 +102,6 @@
         }
       }
     },
-    "Concurrent Jobs": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tareas simultáneas"
-          }
-        }
-      }
-    },
     "Dark": {
       "localizations": {
         "es": {
@@ -148,16 +138,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Earmark aún no tiene actualizador; esta opción se guarda para cuando lo tenga."
-          }
-        }
-      }
-    },
-    "Earmark runs one download and one conversion at a time today; these limits apply once jobs run in parallel.": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hoy Earmark ejecuta una descarga y una conversión a la vez; estos límites se aplicarán cuando las tareas corran en paralelo."
           }
         }
       }
@@ -308,26 +288,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar el progreso al iniciar descargas"
-          }
-        }
-      }
-    },
-    "Simultaneous conversions: %lld": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conversiones simultáneas: %lld"
-          }
-        }
-      }
-    },
-    "Simultaneous downloads: %lld": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Descargas simultáneas: %lld"
           }
         }
       }
