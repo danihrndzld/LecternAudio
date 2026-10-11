@@ -28,7 +28,7 @@ public enum AudibleLibrary {
         for page in 1... {
             var request = request(page: page, pageSize: pageSize, marketplace: account.marketplace)
             try account.sign(&request)
-            let items = try await withRetry(delay: retryDelay) { try await items(from: send(request)) }
+            let items: [Item] = try await withRetry(delay: retryDelay) { try await parseItems(send(request)) }
             books += items.map { book(from: $0, marketplace: account.marketplace) }
             progress(books.count)
             if items.count < pageSize { break }
@@ -46,7 +46,7 @@ public enum AudibleLibrary {
         return try await body()
     }
 
-    static func items(from response: (Data, URLResponse)) throws -> [Item] {
+    static func parseItems(_ response: (Data, URLResponse)) throws -> [Item] {
         let (data, urlResponse) = response
         if let http = urlResponse as? HTTPURLResponse, http.statusCode != 200 {
             throw AudibleError("Audible returned HTTP \(http.statusCode) for the library.")
