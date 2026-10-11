@@ -39,6 +39,11 @@ struct BookDetail: View {
                     }
                 }
 
+                if model.library?.aaxURL(for: book) != nil {
+                    Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.conversion.prepare(book) }
+                        .disabled(model.conversion.isRunning)
+                }
+
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
                     field("Narrator", book.narratedBy)
                     field("Length", book.durationText)

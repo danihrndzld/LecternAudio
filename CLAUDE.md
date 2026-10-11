@@ -14,7 +14,7 @@ Feature inventory of the old app: `docs/openaudible-spec.md`. Stack decision: `d
 - Secrets (tokens, device keys, activation bytes) live in Keychain only. Never log them.
 - Views inside `Table` rows and context menus must not read `@Environment` objects (they crashed: AppKit hosts them outside the window tree); pass dependencies in (see `Cover`, `BookActions`).
 - Never use `NSAttributedString` HTML import; use `HTMLText.markdown`.
-- Out of scope: DRM. Earmark does not derive, recover or apply Audible content keys (activation bytes, AAXC vouchers/key+iv) and does not decrypt AAX/AAXC. It works with already-decrypted M4B/MP3 files.
+- AAX → M4B conversion uses a bundled LGPL FFmpeg helper and user-supplied activation bytes stored only in Keychain. Account-driven key acquisition, downloads and AAXC support are pending, not implemented. Do not depend on OpenAudible's licensed key service. See the end-to-end workflow in `docs/aax-conversion.md`.
 - Derive Audible auth/library API from open sources: mkb79/audible (MIT), audible-cli. Do not copy GPL code (Libation).
 - Keep diffs small; one issue per PR. PR title = Conventional Commit (`feat:`, `fix:`, `chore:`…). It becomes the squash commit.
 

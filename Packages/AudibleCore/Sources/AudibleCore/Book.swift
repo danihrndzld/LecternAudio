@@ -28,6 +28,11 @@ public struct BookFile: Codable, Hashable, Sendable {
     public var path: String
     public var type: FileType?
 
+    public init(path: String, type: FileType) {
+        self.path = path
+        self.type = type
+    }
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         path = try c.decode(String.self, forKey: .path)
