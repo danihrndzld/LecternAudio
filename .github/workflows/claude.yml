@@ -13,7 +13,7 @@ on:
 jobs:
   claude:
     if: |
-      (github.event_name == 'issues' && github.event.label.name == 'agent') ||
+      (github.event_name == 'issues' && github.event.label.name == 'agent' && github.event.sender.login == github.repository_owner) ||
       (github.event_name != 'issues' && contains(github.event.comment.body, '@claude') && github.event.comment.user.login == github.repository_owner)
     runs-on: macos-26
     timeout-minutes: 60
@@ -38,4 +38,4 @@ jobs:
             Conventional Commit and whose body says `Closes #<issue-number>`. Do not wait for review; CI merges it.
           claude_args: |
             --max-turns 80
-            --allowedTools "Edit,Write,Read,Glob,Grep,Bash(git:*),Bash(gh:*),Bash(swift:*),Bash(xcodebuild:*),Bash(xcodegen:*),Bash(open:*),Bash(sleep:*),Bash(pkill:*)"
+            --allowedTools "Edit,Write,Read,Glob,Grep,Bash(swift:*),Bash(xcodebuild:*),Bash(xcodegen:*),Bash(git checkout -b:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin agent/*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(gh pr create:*)"

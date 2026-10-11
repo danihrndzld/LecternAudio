@@ -20,22 +20,28 @@ public struct OpenAudibleLibrary: Sendable {
         books = imported
     }
 
-    public func url(for file: BookFile) -> URL {
-        let dir: String = switch file.type {
+    /// `root/<dir>/<path>`, or nil when `path` (untrusted, from books.json) escapes that folder via `..`, a leading `/` or a symlink.
+    public func url(for file: BookFile) -> URL? {
+        let name: String = switch file.type {
         case .art: "art"
         case .aax, .aaxc: "aax"
         default: "books"
         }
-        return root.appendingPathComponent(dir).appendingPathComponent(file.path)
+        guard !file.path.hasPrefix("/") else { return nil }
+        let dir = root.appendingPathComponent(name, isDirectory: true).standardizedFileURL.resolvingSymlinksInPath()
+        let url = dir.appendingPathComponent(file.path).standardizedFileURL.resolvingSymlinksInPath()
+        let base = dir.pathComponents, parts = url.pathComponents
+        guard parts.count > base.count, Array(parts.prefix(base.count)) == base else { return nil }
+        return url
     }
 
     public func audioURL(for book: Book) -> URL? {
-        book.files.first { $0.type == .m4b || $0.type == .mp3 }.map(url(for:))
+        book.files.first { $0.type == .m4b || $0.type == .mp3 }.flatMap(url(for:))
     }
 
     /// Local cover if OpenAudible saved one, else Audible's CDN image (books never downloaded).
     public func artURL(for book: Book) -> URL? {
-        book.files.first { $0.type == .art }.map(url(for:)) ?? book.imageURL
+        book.files.first { $0.type == .art }.flatMap(url(for:)) ?? book.imageURL
     }
 
     /// Small cover if OpenAudible generated one (often it hasn't), else the full art.
@@ -46,11 +52,11 @@ public struct OpenAudibleLibrary: Sendable {
     }
 
     public func pdfURL(for book: Book) -> URL? {
-        book.files.first { $0.type == .pdf }.map(url(for:))
+        book.files.first { $0.type == .pdf }.flatMap(url(for:))
     }
 
     public func aaxURL(for book: Book) -> URL? {
-        book.files.first { $0.type == .aax }.map(url(for:))
+        book.files.first { $0.type == .aax }.flatMap(url(for:))
     }
 
     public func conversionOutput(for book: Book) -> URL? {

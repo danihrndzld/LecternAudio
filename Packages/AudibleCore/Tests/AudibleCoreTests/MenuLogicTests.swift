@@ -105,3 +105,24 @@ private let exportBooks: [Book] = {
 @Test func crc32KnownAnswer() {
     #expect(Zip.crc32(Data("123456789".utf8)) == 0xCBF4_3926)
 }
+
+@Test func csvNeutralizesFormulas() throws {
+    let books = ["=HYPERLINK(\"x\")", "+1", "-2", "@SUM(A1)", "\tx", "\rx", "Safe"].map { book($0) }
+    let lines = try #require(String(data: LibraryExport.csv(books), encoding: .utf8)).components(separatedBy: "\r\n")
+    #expect(lines[1].hasPrefix(#""'=HYPERLINK(""x"")",A,"#))
+    #expect(lines[2].hasPrefix("'+1,"))
+    #expect(lines[3].hasPrefix("'-2,"))
+    #expect(lines[4].hasPrefix("'@SUM(A1),"))
+    #expect(lines[5].hasPrefix("'\tx,"))
+    #expect(lines[6].hasPrefix("\"'\rx\","))
+    #expect(lines[7].hasPrefix("Safe,"))
+}
+
+@Test func fileNameIsOneSafeComponent() {
+    #expect(Book.fileName("Dune: Part 1/2", fallback: "B1") == "Dune- Part 1-2")
+    #expect(Book.fileName("A\u{0}B\u{1B}C\nD", fallback: "B1") == "ABCD")
+    for title in ["", "  ", ".", "..", ".hidden", "\u{7}", "\n.."] {
+        #expect(Book.fileName(title, fallback: "B1") == "B1", "\(title)")
+    }
+    #expect(Book.fileName("../../evil", fallback: "B1") == "B1")
+}

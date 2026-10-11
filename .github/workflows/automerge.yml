@@ -22,4 +22,8 @@ jobs:
           pr=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,headRefOid,isDraft,labels \
             --jq ".[] | select(.headRefOid == \"$SHA\" and (.isDraft | not) and ([.labels[].name] | index(\"hold\") | not)) | .number")
           [ -z "$pr" ] && { echo "No mergeable PR for $BRANCH@$SHA"; exit 0; }
-          gh pr merge "$pr" -R "$REPO" --squash --delete-branch
+          files=$(gh pr diff "$pr" -R "$REPO" --name-only)  # fails the step (no merge) if gh fails
+          if grep -q '^\.github/' <<< "$files"; then
+            echo "PR #$pr changes .github/; merge it manually."; exit 0
+          fi
+          gh pr merge "$pr" -R "$REPO" --squash --delete-branch --match-head-commit "$SHA"
