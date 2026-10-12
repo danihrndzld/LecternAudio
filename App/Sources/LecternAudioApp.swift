@@ -1,3 +1,4 @@
+import AudibleCore
 import Sparkle
 import SwiftUI
 
@@ -27,6 +28,7 @@ struct LecternAudioApp: App {
                         player.play(book, url: url)
                     }
                     await debugSnapshot()
+                    await debugAria2()
                 }
                 #endif
         }
@@ -61,6 +63,27 @@ struct LecternAudioApp: App {
     guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
     view.cacheDisplay(in: view.bounds, to: rep)
     do { try rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out)) } catch { print("snapshot:", error) }
+    NSApp.terminate(nil)
+}
+
+/// `LECTERN_ARIA2_TEST=<https URL>` downloads the URL through `ContentDownload` with aria2c, then with URLSession only,
+/// prints each duration and quits. Any public range-capable file works; it fails the final audiobook check by design.
+@MainActor private func debugAria2() async {
+    guard let value = ProcessInfo.processInfo.environment["LECTERN_ARIA2_TEST"], let url = URL(string: value) else { return }
+    UserDefaults.standard.register(defaults: [Prefs.aria2: true])
+    let directory = FileManager.default.temporaryDirectory.appending(path: "aria2-test")
+    let session = URLSession(configuration: .ephemeral)
+    for accelerator in [Prefs.aria2Accelerator, nil] {
+        try? FileManager.default.removeItem(at: directory)
+        let start = ContinuousClock.now
+        var outcome = "complete"
+        do {
+            _ = try await ContentDownload.fetch(url: url, destination: directory.appending(path: "file"),
+                                                transfer: { try await session.download(for: $0) }, accelerator: accelerator)
+        } catch { outcome = (error as? AudibleError)?.message ?? "\(error)" }
+        print("aria2-test", accelerator == nil ? "urlsession" : "aria2c", ContinuousClock.now - start, outcome)
+    }
+    print("aria2-test log", AppLog.shared.lines)
     NSApp.terminate(nil)
 }
 #endif

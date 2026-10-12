@@ -28,6 +28,10 @@ jobs:
         with:
           path: build/ffmpeg-8.0
           key: ffmpeg-${{ runner.os }}-${{ hashFiles('scripts/build-ffmpeg.sh') }}
+      - uses: actions/cache@v4
+        with:
+          path: build/aria2-1.37.0
+          key: aria2-${{ runner.os }}-${{ hashFiles('scripts/build-aria2.sh') }}
       - run: brew install xcodegen
       - run: xcodegen generate
       - name: Build, sign and package

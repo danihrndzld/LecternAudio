@@ -32,6 +32,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
 open -n -W --env LECTERN_LIBRARY=<OpenAudible folder> --env LECTERN_SELECT=<asin> --env LECTERN_SNAPSHOT=/tmp/shot.png "build/Build/Products/Debug/Lectern Audio.app"
 ```
 The sidebar renders black in snapshots (vibrancy isn't captured by `cacheDisplay`); that is expected.
+aria2c downloads: a sandboxed Debug build with `--env LECTERN_ARIA2_TEST=<public https file> --stdout <file>` downloads it with aria2c, then URLSession only, and prints both durations. aria2c output can contain the signed URL: never log it.
 
 ## Workflow
 Issues labeled `agent` are implemented by `.github/workflows/claude.yml`. CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green. Add the label `hold` to a PR to stop the merge. PRs that change files under `.github/` are never automerged; merge them by hand. Nobody reviews code, so the tests are the review.

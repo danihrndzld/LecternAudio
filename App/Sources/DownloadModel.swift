@@ -133,12 +133,13 @@ final class DownloadModel {
                 configuration.urlCache = nil
                 let transport = URLSession(configuration: configuration, delegate: DownloadRedirects(), delegateQueue: nil)
                 defer { transport.invalidateAndCancel() }
+                let accelerator = Prefs.aria2Accelerator
                 var downloaded: URL?
                 for attempt in 0..<3 {
                     do {
                         downloaded = try await ContentDownload.fetch(url: license.url, destination: source, transfer: { request in
                             try await transport.download(for: request)
-                        }) { value in
+                        }, accelerator: accelerator) { value in
                             Task { @MainActor in
                                 if self.generation == token, self.activeID == job.id,
                                    self.jobs.first(where: { $0.id == job.id })?.state == .downloading { self.progress = value }
