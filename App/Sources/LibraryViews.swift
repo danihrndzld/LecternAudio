@@ -145,10 +145,12 @@ struct BookActions: View {
             Button("Download and Convert", systemImage: "arrow.down.circle") { model.downloads.enqueue([book]) }
         }
         if model.exports[book.id] != nil {
-            Button("Cancel MP3 Export", systemImage: "xmark.circle") { model.cancelExport(book.id) }
+            Button("Cancel Export", systemImage: "xmark.circle") { model.cancelExport(book.id) }
         } else if model.m4bURL(for: book) != nil {
-            Button("Export MP3…", systemImage: "square.and.arrow.up") { model.exportMP3(book, byChapter: false) }
-            Button("Export MP3 by Chapter…", systemImage: "square.and.arrow.up.on.square") { model.exportMP3(book, byChapter: true) }
+            Button("Export MP3…", systemImage: "square.and.arrow.up") { model.exportAudio(book, ext: "mp3", byChapter: false) }
+            Button("Export MP3 by Chapter…", systemImage: "square.and.arrow.up.on.square") { model.exportAudio(book, ext: "mp3", byChapter: true) }
+            Button("Export Ogg Vorbis…", systemImage: "square.and.arrow.up") { model.exportAudio(book, ext: "ogg", byChapter: false) }
+            Button("Export Ogg Vorbis by Chapter…", systemImage: "square.and.arrow.up.on.square") { model.exportAudio(book, ext: "ogg", byChapter: true) }
         }
         if let pdf = model.library?.pdfURL(for: book), pdf.pathExtension.lowercased() == "pdf" {
             Button("Open PDF", systemImage: "doc.richtext") { NSWorkspace.shared.open(pdf) }

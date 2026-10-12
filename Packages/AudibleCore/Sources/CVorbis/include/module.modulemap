@@ -1,0 +1,5 @@
+module CVorbis {
+    header "vorbis/codec.h"
+    header "vorbis/vorbisenc.h"
+    export *
+}

@@ -90,6 +90,11 @@ import AVFoundation
     tag.title = "Test"
     let mp3 = dir.appendingPathComponent("out.mp3")
     try await MP3Export.run(source: m4a, destination: mp3, tag: tag)
+    // Default options: 320 kbps CBR stereo. First frame after the ID3 tag: bitrate index 14, channel mode not mono.
+    #expect(MP3Export.Options().bitrate == 320 && MP3Export.Options().mode == .cbr)
+    let bytes = [UInt8](try Data(contentsOf: mp3))
+    let frame = 10 + bytes[6..<10].reduce(0) { $0 << 7 | Int($1) }
+    #expect(bytes[frame] == 0xFF && bytes[frame + 2] >> 4 == 14 && bytes[frame + 3] >> 6 != 3)
     let out = try await AVURLAsset(url: mp3).load(.duration).seconds
     #expect(abs(out - source) < 0.1, "source \(source) s, mp3 \(out) s")
 

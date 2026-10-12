@@ -5,9 +5,10 @@ import UniformTypeIdentifiers
 
 /// `UserDefaults` keys shared by the Settings panes (`@AppStorage`) and the code that reads them directly.
 enum Prefs {
-    static let outputFormat = "outputFormat"  // "m4b" or "mp3"
+    static let outputFormat = "outputFormat"  // "m4b", "mp3" or "ogg"
     static let mp3Bitrate = "mp3Bitrate"
     static let mp3VBR = "mp3VBR"
+    static let oggQuality = "oggQuality"  // 0...10
     static let refreshOnLaunch = "refreshOnLaunch"
     static let autoSync = "autoSync"
     static let autoSyncHours = "autoSyncHours"
@@ -24,7 +25,7 @@ enum Prefs {
     /// Defaults for non-view readers; the `@AppStorage` declarations below repeat the same values.
     static func register() {
         UserDefaults.standard.register(defaults: [
-            outputFormat: "m4b", mp3Bitrate: 64, refreshOnLaunch: true, autoSync: true, autoSyncHours: 24,
+            outputFormat: "m4b", mp3Bitrate: 320, oggQuality: 10, refreshOnLaunch: true, autoSync: true, autoSyncHours: 24,
             appearance: "system", tableFontSize: "medium",
         ])
     }
@@ -32,8 +33,14 @@ enum Prefs {
     static var mp3Options: MP3Export.Options {
         var options = MP3Export.Options()
         let bitrate = UserDefaults.standard.integer(forKey: mp3Bitrate)
-        options.bitrate = MP3Encoder.bitrates.contains(bitrate) ? bitrate : 64
+        options.bitrate = MP3Encoder.bitrates.contains(bitrate) ? bitrate : 320
         options.mode = UserDefaults.standard.bool(forKey: mp3VBR) ? .vbr : .cbr
+        return options
+    }
+
+    static var oggOptions: OggExport.Options {
+        var options = OggExport.Options()
+        options.quality = min(max(UserDefaults.standard.integer(forKey: oggQuality), 0), 10)
         return options
     }
 
@@ -78,8 +85,9 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     let updater: SPUUpdater
     @AppStorage(Prefs.outputFormat) private var outputFormat = "m4b"
-    @AppStorage(Prefs.mp3Bitrate) private var bitrate = 64
+    @AppStorage(Prefs.mp3Bitrate) private var bitrate = 320
     @AppStorage(Prefs.mp3VBR) private var vbr = false
+    @AppStorage(Prefs.oggQuality) private var oggQuality = 10
     @AppStorage(Prefs.refreshOnLaunch) private var refreshOnLaunch = true
     @AppStorage(Prefs.autoSync) private var autoSync = true
     @AppStorage(Prefs.autoSyncHours) private var autoSyncHours = 24
@@ -92,23 +100,35 @@ private struct GeneralSettings: View {
     @AppStorage(Prefs.completionSound) private var completionSound = false
     @State private var languageChanged = false
 
+    /// libvorbis nominal bitrates for 44.1 kHz stereo; mono and lower sample rates come out smaller.
+    static func oggQualityText(_ q: Int) -> String {
+        let kbps = [64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 500][min(max(q, 0), 10)]
+        return q >= 10 ? "Maximum (q10, about 500 kbps)" : "q\(q), about \(kbps) kbps"
+    }
+
     var body: some View {
         Form {
             Section("Audio Output") {
                 Picker("Format", selection: $outputFormat) {
                     Text("M4B").tag("m4b")
                     Text("MP3").tag("mp3")
+                    Text("Ogg Vorbis").tag("ogg")
                 }
                 .pickerStyle(.radioGroup)
                 Text(outputFormat == "m4b"
                      ? "Best quality; recommended if your players support it."
-                     : "Downloaded books also get an MP3 copy next to the M4B.")
+                     : "Downloaded books also get an \(outputFormat == "ogg" ? "Ogg Vorbis" : "MP3") copy next to the M4B.")
                     .font(.callout).foregroundStyle(.secondary)
                 Picker("MP3 bitrate", selection: $bitrate) {
                     ForEach(MP3Encoder.bitrates, id: \.self) { Text("\($0) kbps").tag($0) }
                 }
                 Toggle("Variable bitrate (VBR)", isOn: $vbr)
                 Text("Used by Export MP3 and MP3 copies. 64 kbps and below are mono.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Slider(value: Binding(get: { Double(oggQuality) }, set: { oggQuality = Int($0.rounded()) }), in: 0...10, step: 1) {
+                    Text("Ogg Vorbis quality")
+                }
+                Text("Quality: \(Self.oggQualityText(oggQuality)). Used by Export Ogg Vorbis and Ogg copies.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             Section("Automation") {
