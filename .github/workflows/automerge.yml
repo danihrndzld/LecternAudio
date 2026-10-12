@@ -22,7 +22,9 @@ jobs:
           pr=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number,headRefOid,isDraft,labels \
             --jq ".[] | select(.headRefOid == \"$SHA\" and (.isDraft | not) and ([.labels[].name] | index(\"hold\") | not)) | .number")
           [ -z "$pr" ] && { echo "No mergeable PR for $BRANCH@$SHA"; exit 0; }
-          files=$(gh pr diff "$pr" -R "$REPO" --name-only)  # fails the step (no merge) if gh fails
+          # File list via the paginated REST API: `gh pr diff` fails (HTTP 406) on diffs over 20,000 lines.
+          files=$(gh api --paginate "repos/$REPO/pulls/$pr/files" --jq '.[].filename')  # fails the step (no merge) if gh fails
+          [ -n "$files" ] || { echo "Could not list files for PR #$pr"; exit 1; }
           if grep -q '^\.github/' <<< "$files"; then
             echo "PR #$pr changes .github/; merge it manually."; exit 0
           fi
