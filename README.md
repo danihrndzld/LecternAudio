@@ -1,8 +1,8 @@
-# Earmark
+# Lectern Audio
 
-Earmark is a native macOS app for managing the audiobooks in your own Audible library, and it replaces OpenAudible, which is a Java app. Earmark is written in Swift and SwiftUI, so it uses the standard macOS sidebar, table, inspector, menus, and Now Playing controls.
+Lectern Audio is a native macOS app for managing the audiobooks in your own Audible library, and it replaces OpenAudible, which is a Java app. Lectern Audio is written in Swift and SwiftUI, so it uses the standard macOS sidebar, table, inspector, menus, and Now Playing controls.
 
-Earmark is for personal use with books you bought, and it isn't affiliated with Audible or Amazon.
+Lectern Audio is for personal use with books you bought, and it isn't affiliated with Audible or Amazon. The app was called Earmark before it was renamed to Lectern Audio.
 
 ## What the app does
 
@@ -28,24 +28,26 @@ The Help menu can check for updates, open a bug report with your app and macOS v
 
 ## Install
 
-Earmark isn't signed with an Apple Developer ID, so macOS asks you to confirm it once.
+Lectern Audio isn't signed with an Apple Developer ID, so macOS asks you to confirm it once.
 
-1. Download the latest `Earmark` DMG file from the [Releases](https://github.com/danihrndzld/Earmark/releases) page.
-2. Open the DMG and drag Earmark to the Applications folder.
-3. Open Earmark. macOS 26 says it can't verify the app, so click Done.
-4. Open System Settings, go to Privacy & Security, scroll to the Security section, and click Open Anyway next to the Earmark message. Then confirm with your password.
+1. Download the latest `LecternAudio` DMG file from the [Releases](https://github.com/danihrndzld/LecternAudio/releases) page.
+2. Open the DMG and drag Lectern Audio to the Applications folder.
+3. Open Lectern Audio. macOS 26 says it can't verify the app, so click Done.
+4. Open System Settings, go to Privacy & Security, scroll to the Security section, and click Open Anyway next to the Lectern Audio message. Then confirm with your password.
 
-If you prefer the Terminal, this command removes the download flag instead, and Earmark then opens normally.
+If you prefer the Terminal, this command removes the download flag instead, and Lectern Audio then opens normally.
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/Earmark.app
+xattr -dr com.apple.quarantine "/Applications/Lectern Audio.app"
 ```
 
-You only do this once. Earmark checks for new versions once a day with Sparkle, and you can also choose Help, then Check for Updates. When a new version is out, Sparkle shows it with an Install Update button, checks it against Earmark's signing key, and relaunches the app. macOS doesn't ask you to approve the updated app again. You can turn off the daily check in Settings.
+You only do this once. Lectern Audio checks for new versions once a day with Sparkle, and you can also choose Help, then Check for Updates. When a new version is out, Sparkle shows it with an Install Update button, checks it against Lectern Audio's signing key, and relaunches the app. macOS doesn't ask you to approve the updated app again. You can turn off the daily check in Settings.
+
+If you used the app when it was called Earmark, macOS treats Lectern Audio as a new app, so you set it up again once. Choose your OpenAudible folder again, sign in to Audible again, and set your preferences in Settings again. Books that Earmark already converted stay in your OpenAudible folder, and Lectern Audio finds them.
 
 ## Requirements
 
-You need macOS 26 or later to run Earmark. To build it, you need Xcode 26 or later and XcodeGen, which you can install with Homebrew.
+You need macOS 26 or later to run Lectern Audio. To build it, you need Xcode 26 or later and XcodeGen, which you can install with Homebrew.
 
 The first build downloads the FFmpeg 8.0 source code, checks its checksum, and builds a small FFmpeg helper that the app uses for conversion. Later builds reuse the cached helper, so you don't need to install FFmpeg yourself.
 
@@ -56,20 +58,20 @@ Run the following commands from the repository folder.
 ```sh
 brew install xcodegen
 xcodegen generate
-open Earmark.xcodeproj
+open LecternAudio.xcodeproj
 ```
 
-Then build and run the `Earmark` scheme in Xcode. The project file is generated from `project.yml`, and Git ignores it, so run `xcodegen generate` again after you pull changes.
+Then build and run the `LecternAudio` scheme in Xcode. The project file is generated from `project.yml`, and Git ignores it, so run `xcodegen generate` again after you pull changes.
 
 ## First use
 
-When you open Earmark for the first time, you can start from an OpenAudible folder, from your Audible account, or from both.
+When you open Lectern Audio for the first time, you can start from an OpenAudible folder, from your Audible account, or from both.
 
-1. To use an OpenAudible library, choose File, then Open OpenAudible Library, and select the folder that contains `books.json`. Earmark reads the folder and doesn't change OpenAudible's files.
-2. To use your Audible account, open Settings, go to the Account tab, and choose Sign In to Audible. Amazon's sign in page opens inside Earmark, and it handles the captcha and two factor codes itself.
+1. To use an OpenAudible library, choose File, then Open OpenAudible Library, and select the folder that contains `books.json`. Lectern Audio reads the folder and doesn't change OpenAudible's files.
+2. To use your Audible account, open Settings, go to the Account tab, and choose Sign In to Audible. Amazon's sign in page opens inside Lectern Audio, and it handles the captcha and two factor codes itself.
 3. After you sign in, click the sync button in the toolbar to fetch your library. Books that exist only in your account appear under "In Audible Only" in the sidebar.
 
-Earmark keeps your account tokens in the macOS Keychain. When you sign out, Earmark removes the device from your Amazon account and deletes the saved tokens and the synced library file.
+Lectern Audio keeps your account tokens in the macOS Keychain. When you sign out, Lectern Audio removes the device from your Amazon account and deletes the saved tokens and the synced library file.
 
 More details about downloads and conversion are in [docs/aax-conversion.md](docs/aax-conversion.md).
 
@@ -89,7 +91,7 @@ Run the package tests and a full app build with the commands below. CI runs the 
 ```sh
 swift test --package-path Packages/AudibleCore
 xcodegen generate
-xcodebuild -scheme Earmark -destination platform=macOS -derivedDataPath build build
+xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build
 ```
 
 The tests run offline, because CI can't sign in to Audible. Network code is tested against recorded responses with personal data removed.
@@ -112,13 +114,13 @@ To publish a version, push a tag that starts with `v`.
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for Sparkle with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. Run `scripts/release.sh 0.2.0 1` to build the same files on your Mac; it signs with the Sparkle key in your login Keychain. The feed address is the `EARMARK_FEED_URL` setting in `project.yml`.
+The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for Sparkle with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. Run `scripts/release.sh 0.2.0 1` to build the same files on your Mac; it signs with the Sparkle key in your login Keychain. The feed address is the `LECTERN_FEED_URL` setting in `project.yml`.
 
 Sparkle reads the feed without signing in to GitHub, so updates only reach people when the repository is public.
 
 ## Licenses
 
-Earmark bundles third party code under the licenses listed below.
+Lectern Audio bundles third party code under the licenses listed below.
 
 - LAME 3.100 for MP3 encoding, under the LGPL.
 - FFmpeg 8.0 for conversion, under the LGPL 2.1. The app includes the license, the matching source archive, and the build script.

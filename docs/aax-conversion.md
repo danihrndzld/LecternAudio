@@ -11,15 +11,15 @@ Inspected the installed OpenAudible 5.0.1 package on 2026-10-11. REA identified 
 
 `ConvertJob.getM4AArgs` uses `-c:a copy` for AAX/AAXC, maps audio/artwork, adds `-movflags +faststart` and `media_type=2`. Its shared argument builder puts `-activation_bytes` before the AAX input and uses a metadata input for chapters. It selects metadata chapters when the book has a chapter list, otherwise the source chapters. Artwork is an attached picture. This confirms lossless remuxing rather than AAC re-encoding.
 
-`LookupKey.lookupKey` first checks its checksum-indexed cache, then calls `remoteLookup`; the path also checks OpenAudible license membership. Earmark does not reproduce this service or its licensing behavior. The existing `openaudible-spec.md` contains the wider investigation, including earlier observations of staging output and key lookup.
+`LookupKey.lookupKey` first checks its checksum-indexed cache, then calls `remoteLookup`; the path also checks OpenAudible license membership. Lectern Audio does not reproduce this service or its licensing behavior. The existing `openaudible-spec.md` contains the wider investigation, including earlier observations of staging output and key lookup.
 
 The implementation is independently written against the public [FFmpeg AAX demuxer documentation](https://ffmpeg.org/ffmpeg-formats.html#Audible-AAX) and [FFmpeg command documentation](https://ffmpeg.org/ffmpeg.html). No OpenAudible or GPL conversion code is copied.
 
-## Earmark behavior
+## Lectern Audio behavior
 
 ### Historical gap: account-driven automation
 
-The initial key field and per-book Keychain entry were an Earmark implementation shortcut, not OpenAudible's user flow. The account-driven workflow described below now replaces that prompt for signed-in library books; manual keys remain available for standalone local imports.
+The initial key field and per-book Keychain entry were a Lectern Audio implementation shortcut, not OpenAudible's user flow. The account-driven workflow described below now replaces that prompt for signed-in library books; manual keys remain available for standalone local imports.
 
 A follow-up inspection on 2026-10-11 established:
 
@@ -35,7 +35,7 @@ The product flow is account sign-in → library sync → authorized download →
 ### Account-driven workflow
 
 - Sign-in persists the registered device, bearer/refresh tokens, customer identity and registration cookies in Keychain. The browser remains nonpersistent; restoring the app session does not require browser cookies. Older saved sessions obtain missing identity and cookies through Amazon's authenticated profile and cookie-exchange endpoints. Failed restoration preserves the previous Keychain item and asks the user to sign in again.
-- Catalogs, outputs and queue files are isolated under `Application Support/Earmark/accounts/<hashed account and marketplace>/`. Signing out cancels current work and hides that account's catalog; saved audio is retained. Signed API requests use an ephemeral transport that rejects redirects. CDN requests carry no account authentication or cookies.
+- Catalogs, outputs and queue files are isolated under `Application Support/Lectern Audio/accounts/<hashed account and marketplace>/`. Signing out cancels current work and hides that account's catalog; saved audio is retained. Signed API requests use an ephemeral transport that rejects redirects. CDN requests carry no account authentication or cookies.
 - **Download and Convert** requests a signed, granted AAXC license for the selected ASIN, decodes its voucher in memory and runs FFmpeg with `-audible_key` / `-audible_iv`. No raw license or key is written to disk. For locally imported AAX books present in the synced library, the signed activation endpoint supplies account-level activation data cached in Keychain.
 - The serial queue persists metadata and state. Interrupted work requeues on relaunch, while failed/cancelled jobs wait for **Retry**. Downloads use disk-backed HTTP ranges and retain completed chunks; servers that ignore ranges restart the transfer without appending duplicate bytes. Partial files are scoped by a fingerprint of their content credentials. A fresh license is requested on retry/relaunch.
 - Output is validated before registration. Existing output left by an interruption is checked before adoption, never overwritten. Original downloads are kept. Embedded chapters/artwork are retained, with license chapters and the library cover used when available.
@@ -50,11 +50,11 @@ Account-workflow verification: 46 core tests passed locally, including the optio
 ### Implemented local-file workflow
 
 1. Select a book with an AAX file and choose **Convert to M4B…** in the inspector, context menu or Conversion menu.
-2. Earmark uses its bundled FFmpeg helper. `scripts/build-ffmpeg.sh` downloads the checksum-pinned, unmodified FFmpeg 8.0 archive from ffmpeg.org and compiles only the needed formats/codecs, with GPL/nonfree components disabled. It builds the Xcode target architectures and caches them under `build/ffmpeg-8.0`. The app bundles the source archive, LGPL license and build script under `Contents/Resources/FFmpeg`.
-3. Enter the eight hexadecimal activation characters for the account that owns the file. Optional persistence uses Keychain, keyed by book ID. Earmark does not obtain keys automatically. The key is passed to FFmpeg in process arguments as required by its CLI, so it is visible to sufficiently privileged process inspection while conversion runs. It is never written to conversion metadata or application logs. FFmpeg stderr is discarded to prevent accidental key disclosure; failures therefore show a generic actionable message.
+2. Lectern Audio uses its bundled FFmpeg helper. `scripts/build-ffmpeg.sh` downloads the checksum-pinned, unmodified FFmpeg 8.0 archive from ffmpeg.org and compiles only the needed formats/codecs, with GPL/nonfree components disabled. It builds the Xcode target architectures and caches them under `build/ffmpeg-8.0`. The app bundles the source archive, LGPL license and build script under `Contents/Resources/FFmpeg`.
+3. Enter the eight hexadecimal activation characters for the account that owns the file. Optional persistence uses Keychain, keyed by book ID. Lectern Audio does not obtain keys automatically. The key is passed to FFmpeg in process arguments as required by its CLI, so it is visible to sufficiently privileged process inspection while conversion runs. It is never written to conversion metadata or application logs. FFmpeg stderr is discarded to prevent accidental key disclosure; failures therefore show a generic actionable message.
 4. The core actor runs one conversion at a time. It passes arguments directly to `Process`, without a shell. Audio is copied; a local library cover is preferred, with optional embedded video artwork as fallback. Imported title, author, narrator, genre and summary override corresponding source tags; `ausr` is removed and audiobook media type is set. Valid library chapters override embedded chapters. Missing, overlapping or invalid chapter lists fall back to the source.
 5. Progress comes from FFmpeg's machine-readable `out_time_us`, relative to the imported duration. Cancellation terminates the process, escalates after a short grace period, and removes staging files. Missing/incorrect duration affects progress display, not conversion.
-6. Output is staged in a unique directory beside the destination. On successful FFmpeg exit, Earmark checks nonempty output and decodes the first second without any key. This is an initial playability check, not a complete decode verification of an entire audiobook. It then moves the result to `books/Earmark/<source name>.m4b`, refusing to replace existing files. The original AAX is kept.
+6. Output is staged in a unique directory beside the destination. On successful FFmpeg exit, Lectern Audio checks nonempty output and decodes the first second without any key. This is an initial playability check, not a complete decode verification of an entire audiobook. It then moves the result to `books/Earmark/<source name>.m4b`, refusing to replace existing files. The original AAX is kept.
 7. `earmark-conversions.json` maps book IDs to converted file paths. Loading the library merges existing outputs into the book list, enabling playback and MP3 export. OpenAudible's `books.json` is never rewritten. If recording fails, the newly converted output is removed so a retry can proceed.
 
 The manual local-import path accepts `.aax`; AAXC is handled by the account download workflow. Existing local-import output collisions are reported rather than overwritten; rename or move the existing output before retrying.
@@ -63,15 +63,15 @@ The manual local-import path accepts `.aax`; AAXC is handled by the account down
 
 ```sh
 swift test --package-path Packages/AudibleCore
-EARMARK_TEST_FFMPEG=/opt/homebrew/bin/ffmpeg swift test --package-path Packages/AudibleCore
+LECTERN_TEST_FFMPEG=/opt/homebrew/bin/ffmpeg swift test --package-path Packages/AudibleCore
 xcodegen generate
-xcodebuild -scheme Earmark -destination platform=macOS -derivedDataPath build build
+xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build
 ```
 
-Offline tests cover key validation/redacted descriptions, argument ordering, chapter escaping and fallback, metadata registration/reload, output collisions, conversion/validation failure, cancellation and staging cleanup. The optional real FFmpeg test generates unencrypted AAC in an MP4 container named `.aax` to exercise remuxing and chapter/tag preservation; it requires a full FFmpeg build with `lavfi` and an AAC encoder. A separate optional encrypted test uses `EARMARK_TEST_AAX` and `EARMARK_TEST_AAX_KEY`, converts the supplied file and rejects an incorrect key. This was run successfully against the public AAX sample linked by the [FFmpeg demuxer contributor](https://ffmpeg.org/pipermail/ffmpeg-devel/2015-July/175788.html). No user secrets or audiobook files are committed as fixtures.
+Offline tests cover key validation/redacted descriptions, argument ordering, chapter escaping and fallback, metadata registration/reload, output collisions, conversion/validation failure, cancellation and staging cleanup. The optional real FFmpeg test generates unencrypted AAC in an MP4 container named `.aax` to exercise remuxing and chapter/tag preservation; it requires a full FFmpeg build with `lavfi` and an AAC encoder. A separate optional encrypted test uses `LECTERN_TEST_AAX` and `LECTERN_TEST_AAX_KEY`, converts the supplied file and rejects an incorrect key. This was run successfully against the public AAX sample linked by the [FFmpeg demuxer contributor](https://ffmpeg.org/pipermail/ffmpeg-devel/2015-July/175788.html). No user secrets or audiobook files are committed as fixtures.
 
 The helper lives in `Contents/Helpers/ffmpeg` and is signed with exactly `app-sandbox` and `inherit` entitlements, following [Apple's helper-tool guidance](https://developer.apple.com/documentation/xcode/embedding-a-helper-tool-in-a-sandboxed-app). Selecting an external Homebrew executable is insufficient in the App Sandbox, as verified with a sandboxed probe. The app keeps its existing sandbox enabled. CI builds with `CODE_SIGNING_ALLOWED=NO` compile/package the helper but cannot validate signed runtime behavior.
 
 Local verification: 17 tests passed with Xcode 27.1's toolchain targeting macOS 26, including public encrypted-AAX success/wrong-key rejection. The encrypted test also passed with the minimal FFmpeg 8.0 build. A signed sandbox probe converted the public sample in an external folder granted through `NSOpenPanel`; its output duration was 2985.900408 seconds. The signed app built successfully, its nested signatures verified, and the conversion sheet was rendered and visually inspected. Linux CI was not run locally.
 
-For UI snapshots, `EARMARK_CONVERSION_PREVIEW=1` opens the conversion sheet for `EARMARK_SELECT` in debug builds, without reading Keychain or starting a conversion. It works with the existing `EARMARK_LIBRARY` and `EARMARK_SNAPSHOT` debug variables.
+For UI snapshots, `LECTERN_CONVERSION_PREVIEW=1` opens the conversion sheet for `LECTERN_SELECT` in debug builds, without reading Keychain or starting a conversion. It works with the existing `LECTERN_LIBRARY` and `LECTERN_SNAPSHOT` debug variables.

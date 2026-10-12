@@ -75,7 +75,7 @@ struct ContentView: View {
         .onChange(of: session.account?.storageID, initial: true) { _, _ in model.useAudible(session) }
         .task(id: session.account?.deviceSerial) {
             #if DEBUG
-            if ProcessInfo.processInfo.environment["EARMARK_DOWNLOADS_PREVIEW"] == "1" { showDownloads = true }
+            if ProcessInfo.processInfo.environment["LECTERN_DOWNLOADS_PREVIEW"] == "1" { showDownloads = true }
             #endif
             // The first pass is the launch; later passes are sign-ins, which always sync.
             defer { launched = true }

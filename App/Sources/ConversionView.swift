@@ -16,7 +16,7 @@ struct ConversionView: View {
                 Text("Use the activation bytes for the Audible account that owns this AAX file.")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("Remember in Keychain for this book", isOn: $conversion.rememberKey)
-                Text("Conversion uses FFmpeg (LGPL 2.1), included with Earmark.")
+                Text("Conversion uses FFmpeg (LGPL 2.1), included with Lectern Audio.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if conversion.isRunning {

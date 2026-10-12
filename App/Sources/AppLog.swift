@@ -7,7 +7,7 @@ import SwiftUI
 final class AppLog {
     static let shared = AppLog()
     private(set) var lines: [String] = []
-    private let logger = Logger(subsystem: "com.danihrndzld.earmark", category: "app")
+    private let logger = Logger(subsystem: "com.danihrndzld.lecternaudio", category: "app")
 
     func info(_ message: String) { append(message, error: false) }
     func error(_ message: String) { append(message, error: true) }

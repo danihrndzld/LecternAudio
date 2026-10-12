@@ -59,6 +59,8 @@ public struct OpenAudibleLibrary: Sendable {
         book.files.first { $0.type == .aax }.flatMap(url(for:))
     }
 
+    // "books/Earmark" and "earmark-conversions.json" keep the app's former name on purpose: they live in the
+    // user's OpenAudible folder, so renaming them would orphan books converted before the Lectern Audio rename.
     public func conversionOutput(for book: Book) -> URL? {
         guard let input = aaxURL(for: book) else { return nil }
         return root.appendingPathComponent("books/Earmark", isDirectory: true)

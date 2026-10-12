@@ -127,7 +127,7 @@ public enum AudibleLibrary {
         return merged
     }
 
-    /// Earmark's own copy of the list, in books.json format.
+    /// Lectern Audio's own copy of the list, in books.json format.
     public static func load(from url: URL) -> [Book] {
         (try? JSONDecoder().decode([Book].self, from: Data(contentsOf: url))) ?? []
     }

@@ -12,7 +12,7 @@ private func conversionBook() throws -> Book {
 }
 
 private func temporaryConversionDirectory() throws -> URL {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("earmark-tests-\(UUID().uuidString)")
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("lectern-tests-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     return url
 }
@@ -107,7 +107,7 @@ private func fakeFFmpeg(in root: URL, body: String) throws -> URL {
     await #expect(throws: ConversionError.outputExists) {
         try await converter.convert(request, activationBytes: key, ffmpeg: executable)
     }
-    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).allSatisfy { !$0.hasPrefix(".earmark-") })
+    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).allSatisfy { !$0.hasPrefix(".lectern-") })
 }
 
 @Test(arguments: [false, true]) func failedConversionRemovesPartialOutput(validationFailure: Bool) async throws {
@@ -129,7 +129,7 @@ private func fakeFFmpeg(in root: URL, body: String) throws -> URL {
     }
     #expect(!FileManager.default.fileExists(atPath: output.path))
     #expect(FileManager.default.fileExists(atPath: input.path))
-    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).allSatisfy { !$0.hasPrefix(".earmark-") })
+    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).allSatisfy { !$0.hasPrefix(".lectern-") })
 }
 
 @Test func cancellationStopsProcessAndRemovesPartialOutput() async throws {
@@ -150,12 +150,12 @@ private func fakeFFmpeg(in root: URL, body: String) throws -> URL {
     task.cancel()
     await #expect(throws: CancellationError.self) { try await task.value }
     #expect(!FileManager.default.fileExists(atPath: output.path))
-    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).allSatisfy { !$0.hasPrefix(".earmark-") })
+    #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).allSatisfy { !$0.hasPrefix(".lectern-") })
 }
 
-@Test(.enabled(if: ProcessInfo.processInfo.environment["EARMARK_TEST_FFMPEG"] != nil))
+@Test(.enabled(if: ProcessInfo.processInfo.environment["LECTERN_TEST_FFMPEG"] != nil))
 func realFFmpegRemuxPreservesChapters() async throws {
-    let executable = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["EARMARK_TEST_FFMPEG"]))
+    let executable = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["LECTERN_TEST_FFMPEG"]))
     let root = try temporaryConversionDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     let source = root.appendingPathComponent("source.aax")
@@ -186,12 +186,12 @@ func realFFmpegRemuxPreservesChapters() async throws {
     #expect(metadata.contains("title=Two"))
 }
 
-@Test(.enabled(if: ProcessInfo.processInfo.environment["EARMARK_TEST_AAX"] != nil))
+@Test(.enabled(if: ProcessInfo.processInfo.environment["LECTERN_TEST_AAX"] != nil))
 func encryptedAAXConvertsAndRejectsWrongKey() async throws {
     let environment = ProcessInfo.processInfo.environment
-    let executable = URL(fileURLWithPath: try #require(environment["EARMARK_TEST_FFMPEG"]))
-    let source = URL(fileURLWithPath: try #require(environment["EARMARK_TEST_AAX"]))
-    let key = try ActivationBytes(try #require(environment["EARMARK_TEST_AAX_KEY"]))
+    let executable = URL(fileURLWithPath: try #require(environment["LECTERN_TEST_FFMPEG"]))
+    let source = URL(fileURLWithPath: try #require(environment["LECTERN_TEST_AAX"]))
+    let key = try ActivationBytes(try #require(environment["LECTERN_TEST_AAX_KEY"]))
     let root = try temporaryConversionDirectory()
     defer { try? FileManager.default.removeItem(at: root) }
     var book = try conversionBook()

@@ -22,7 +22,7 @@ for architecture in $architectures; do
     case "$architecture" in arm64|x86_64) ;; *) echo "Unsupported FFmpeg architecture: $architecture" >&2; exit 1 ;; esac
     build_dir="$cache/$architecture"
     stamp="$script_sha-$deployment_target"
-    if [ ! -x "$build_dir/ffmpeg" ] || [ "$(cat "$build_dir/earmark-build-id" 2>/dev/null || true)" != "$stamp" ]; then
+    if [ ! -x "$build_dir/ffmpeg" ] || [ "$(cat "$build_dir/lectern-build-id" 2>/dev/null || true)" != "$stamp" ]; then
         mkdir -p "$build_dir"
         (
             cd "$build_dir"
@@ -38,7 +38,7 @@ for architecture in $architectures; do
                 --enable-encoder=pcm_s16le --enable-parser=aac,png,mjpeg \
                 --enable-filter=aformat,anull,aresample --enable-bsf=aac_adtstoasc > configure.log 2>&1
             make -j "$(sysctl -n hw.ncpu)" ffmpeg > build.log 2>&1
-            printf '%s' "$stamp" > earmark-build-id
+            printf '%s' "$stamp" > lectern-build-id
         )
     fi
     binaries+=("$build_dir/ffmpeg")

@@ -12,8 +12,8 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
-            Button("About Earmark") {
-                AuxWindow.show("about", title: "About Earmark", resizable: false) { AboutView(session: session) }
+            Button("About Lectern Audio") {
+                AuxWindow.show("about", title: "About Lectern Audio", resizable: false) { AboutView(session: session) }
             }
         }
         AccountCommands()
@@ -261,9 +261,9 @@ private struct HelpCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .help) {
-            Button("Earmark Help") { NSWorkspace.shared.open(AppInfo.repo.appending(path: "blob/main/README.md")) }
+            Button("Lectern Audio Help") { NSWorkspace.shared.open(AppInfo.repo.appending(path: "blob/main/README.md")) }
                 .keyboardShortcut(functionKey(NSF1FunctionKey), modifiers: [])
-            Button("Earmark Web Page") { NSWorkspace.shared.open(AppInfo.repo) }
+            Button("Lectern Audio Web Page") { NSWorkspace.shared.open(AppInfo.repo) }
             Divider()
             Button("Check for Updates…") { updater.checkForUpdates() }
                 .keyboardShortcut("u")

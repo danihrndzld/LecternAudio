@@ -1,4 +1,4 @@
-# Pushing a tag vX.Y.Z builds Earmark X.Y.Z, ad-hoc signed, and publishes a GitHub Release with the DMG,
+# Pushing a tag vX.Y.Z builds Lectern Audio X.Y.Z, ad-hoc signed, and publishes a GitHub Release with the DMG,
 # the ZIP and the Sparkle appcast.xml. The build number is the run number, so Sparkle always sees it grow.
 name: Release
 on:
@@ -40,5 +40,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${TAG#v}"
-          gh release create "$TAG" --verify-tag --title "Earmark $version" --generate-notes \
-            "build/release/Earmark-$version.dmg" "build/release/Earmark-$version.zip" build/release/appcast.xml
+          gh release create "$TAG" --verify-tag --title "Lectern Audio $version" --generate-notes \
+            "build/release/LecternAudio-$version.dmg" "build/release/LecternAudio-$version.zip" build/release/appcast.xml

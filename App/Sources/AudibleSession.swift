@@ -13,7 +13,7 @@ final class AudibleSession {
 
     init() {
         #if DEBUG
-        if ProcessInfo.processInfo.environment["EARMARK_SNAPSHOT"] != nil { return }
+        if ProcessInfo.processInfo.environment["LECTERN_SNAPSHOT"] != nil { return }
         #endif
         account = Keychain.load().flatMap { try? JSONDecoder().decode(AudibleAccount.self, from: $0) }
     }
@@ -106,7 +106,7 @@ final class AudibleSession {
 private enum Keychain {
     static let base: [CFString: Any] = [
         kSecClass: kSecClassGenericPassword,
-        kSecAttrService: "com.danihrndzld.earmark",
+        kSecAttrService: "com.danihrndzld.lecternaudio",
         kSecAttrAccount: "audible",
     ]
 
@@ -143,7 +143,7 @@ struct SignInView: View {
         @Bindable var session = session
         Group {
             if registering {
-                ProgressView("Registering Earmark with Audible…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView("Registering Lectern Audio with Audible…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let signIn {
                 AmazonWebView(signIn: signIn) { redirect in
                     registering = true
@@ -159,7 +159,7 @@ struct SignInView: View {
                     Picker("Marketplace", selection: $marketplaceCode) {
                         ForEach(Marketplace.all) { Text("\($0.name) (audible.\($0.domain))").tag($0.code) }
                     }
-                    Text("Earmark registers itself as an Audible device, like the Audible app on a phone. Your password goes only to Amazon.")
+                    Text("Lectern Audio registers itself as an Audible device, like the Audible app on a phone. Your password goes only to Amazon.")
                         .font(.callout).foregroundStyle(.secondary)
                     HStack {
                         Spacer()

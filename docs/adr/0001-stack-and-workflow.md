@@ -8,6 +8,8 @@ Status: accepted 2026-10-11. The memo below was written by an advisor model (Fab
 - macOS CI minutes are billed on private repos; the core suite also runs on Linux to keep feedback cheap.
 - AAX/AAXC conversion uses bundled LGPL FFmpeg (amended at the owner's request, 2026-10-11). The helper inherits the app sandbox; arbitrary external executables cannot be launched there. The account workflow requests authorized licenses and manages credentials internally, retaining manual activation only for standalone imports. See `../aax-conversion.md` for validation and limitations. OpenAudible's licensed key service is not a dependency; the memo's native decrypt proposal below is superseded.
 
+Note: the app was renamed from Earmark to Lectern Audio after this ADR; the text above and below keeps the old name.
+
 ---
 
 # OpenAudible rebuild: decision memo (2026-10-11)

@@ -126,7 +126,7 @@ public actor AAXConverter {
         guard ffmpeg.isFileURL, manager.isExecutableFile(atPath: ffmpeg.path) else { throw ConversionError.ffmpegUnavailable }
         let parent = request.output.deletingLastPathComponent()
         try manager.createDirectory(at: parent, withIntermediateDirectories: true)
-        let working = parent.appendingPathComponent(".earmark-\(UUID().uuidString)", isDirectory: true)
+        let working = parent.appendingPathComponent(".lectern-\(UUID().uuidString)", isDirectory: true)
         try manager.createDirectory(at: working, withIntermediateDirectories: false)
         defer { try? manager.removeItem(at: working) }
         let metadata = working.appendingPathComponent("chapters.txt")
