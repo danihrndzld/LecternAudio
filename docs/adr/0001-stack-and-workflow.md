@@ -6,13 +6,13 @@ Status: accepted 2026-10-11. The memo below was written by an advisor model (Fab
 - No release, notarization or Sparkle pipeline yet: the only signing identity available is Apple Development (no Developer ID). Add it when a Developer ID exists.
 - GRDB is deferred until Earmark owns its own library store (sync issue). v0.1 reads OpenAudible's `books.json` directly.
 - macOS CI minutes are billed on private repos; the core suite also runs on Linux to keep feedback cheap.
-- AAX/AAXC conversion uses bundled LGPL FFmpeg (amended at the owner's request, 2026-10-11). The helper inherits the app sandbox; arbitrary external executables cannot be launched there. The account workflow requests authorized licenses and manages credentials internally, retaining manual activation only for standalone imports. See `../aax-conversion.md` for validation and limitations. OpenAudible's licensed key service is not a dependency; the memo's native decrypt proposal below is superseded.
+- AAX/AAXC conversion uses bundled LGPL FFmpeg (amended at the owner's request, 2026-10-11). The helper inherits the app sandbox; arbitrary external executables cannot be launched there. The account workflow requests authorized licenses and manages credentials internally, retaining manual activation only for standalone imports. See `../aax-conversion.md` for validation and limitations. No third party key service is a dependency; the memo's native decrypt proposal below is superseded.
 
 Note: the app was renamed from Earmark to Lectern Audio after this ADR; the text above and below keeps the old name.
 
 ---
 
-# OpenAudible rebuild: decision memo (2026-10-11)
+# Decision memo (2026-10-11)
 
 ## 1. Stack: native Swift; no Tauri, no Rust core
 
@@ -35,11 +35,11 @@ Settings: Allow auto-merge; squash only, message = PR title; auto-delete branche
 Tokens: custom GitHub App (Contents/Issues/PRs read-write) via `actions/create-github-app-token@v1`, passed as `github_token` to claude-code-action and `token` to release-please. GITHUB_TOKEN-created pushes and PRs never trigger CI.
 
 Workflows in `.github/workflows/`:
-- `ci.yml` (pull_request, merge_group): job `macOS` on `macos-26`: `sudo xcode-select -s /Applications/Xcode_26.6.app`, `xcodegen generate`, `xcodebuild test -scheme OpenAudible -destination platform=macOS`; job `core-linux`: `swift test --package-path Packages/AudibleCore`; jobs `pr-title` (`amannn/action-semantic-pull-request`, squash commit = PR title) and `claude-review` (docs/solutions.md prompt, `additional_permissions: actions: read`, fails on verdict `block`) with `if: github.event_name == 'pull_request'` (skipped = success in the queue).
+- `ci.yml` (pull_request, merge_group): job `macOS` on `macos-26`: `sudo xcode-select -s /Applications/Xcode_26.6.app`, `xcodegen generate`, `xcodebuild test -scheme LecternAudio -destination platform=macOS`; job `core-linux`: `swift test --package-path Packages/AudibleCore`; jobs `pr-title` (`amannn/action-semantic-pull-request`, squash commit = PR title) and `claude-review` (docs/solutions.md prompt, `additional_permissions: actions: read`, fails on verdict `block`) with `if: github.event_name == 'pull_request'` (skipped = success in the queue).
 - `claude-issue.yml` (issues labeled `claude`): `runs-on: macos-26`, `anthropics/claude-code-action@v1`, `claude_code_oauth_token` (`claude setup-token`); prompt: implement, test, `git checkout -b claude/<issue>`, push, `gh pr create`, `gh pr merge --auto --squash --delete-branch`; `claude_args: --allowedTools "Edit,Read,Write,Bash(git:*),Bash(gh pr:*),Bash(xcodebuild:*),Bash(swift:*)" --max-turns 60`. By default Claude only "links to a prefilled PR creation page".
 - `automerge.yml` (`pull_request_target` opened; author `dependabot[bot]` or `<app>[bot]`): `gh pr merge --auto --squash --delete-branch` with `GH_TOKEN` = App token, so the merge push triggers `release-please.yml` (https://cli.github.com/manual/gh_pr_merge).
 - `release-please.yml` (`schedule` weekly Monday + `workflow_dispatch`): `googleapis/release-please-action@v4`, `release-type: simple` writes `version.txt` + `CHANGELOG.md`; `project.yml` reads it into `MARKETING_VERSION`; `CURRENT_PROJECT_VERSION = github.run_number` (Sparkle needs numeric builds).
-- `release.yml` (release published): `apple-actions/import-codesign-certs`, `xcodebuild archive`, `xcrun notarytool submit OpenAudible.zip --key --key-id --issuer --wait`, `xcrun stapler staple`, Sparkle `generate_appcast` (ed25519 secret), upload asset, commit `appcast.xml` to `gh-pages`.
+- `release.yml` (release published): `apple-actions/import-codesign-certs`, `xcodebuild archive`, `xcrun notarytool submit LecternAudio.zip --key --key-id --issuer --wait`, `xcrun stapler staple`, Sparkle `generate_appcast` (ed25519 secret), upload asset, commit `appcast.xml` to `gh-pages`.
 - `dependabot.yml`: `swift`, `github-actions`, weekly.
 
 UI verification: swift-snapshot-testing 1.19.6 (Swift Testing attachments, macOS 27 fix; https://github.com/pointfreeco/swift-snapshot-testing/releases). Render through `NSHostingView.cacheDisplay(in:to:)`, not an `NSWindow` (title-bar height differs on headless VMs); record references on the pinned `macos-26` image; upload diffs as artifacts. Plus one XCUITest smoke test.
@@ -50,7 +50,7 @@ UI verification: swift-snapshot-testing 1.19.6 (Swift Testing attachments, macOS
 project.yml      # xcodegen; SWIFT_VERSION 6; App: SWIFT_DEFAULT_ACTOR_ISOLATION MainActor, SWIFT_APPROACHABLE_CONCURRENCY YES
 App/{OpenAudibleApp.swift, Features/{Library,Detail,Player,Settings}, Tests, UITests}
 Packages/AudibleCore/{Sources/{AudibleAuth,AudibleAPI,AAXDecrypt,Library,Download}, Tests}
-OpenAudible.entitlements  CLAUDE.md  version.txt  release-please-config.json
+LecternAudio.entitlements  CLAUDE.md  version.txt  release-please-config.json
 ```
 
 - Storage: GRDB 7.11.1 (Swift 6.1+, FTS5, Linux; https://github.com/groue/GRDB.swift/releases), not SwiftData (no Linux, no headless migration tests).

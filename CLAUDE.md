@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Lectern Audio (renamed from Earmark) is a native macOS SwiftUI app that manages the owner's own Audible library and replaces OpenAudible (Java/SWT). Feature inventory of the old app: `docs/openaudible-spec.md`. Stack decision: `docs/adr/0001-stack-and-workflow.md`. Lessons learned from past bugs, crashes and slowdowns: `docs/memory.md` (read it before touching the library UI, the build, or the workflows, and add to it when you learn something the hard way).
+Lectern Audio (renamed from Earmark) is a native macOS SwiftUI app that manages the owner's own Audible library. It can also open an existing OpenAudible library folder (`books.json`). Stack decision: `docs/adr/0001-stack-and-workflow.md`. Lessons learned from past bugs, crashes and slowdowns: `docs/memory.md` (read it before touching the library UI, the build, or the workflows, and add to it when you learn something the hard way).
 
 ## Commands
 
@@ -40,7 +40,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
 - Swift 6 strict concurrency. No `@unchecked Sendable` or `nonisolated(unsafe)` without a one-line reason.
 - CI cannot log into Audible. Every network or crypto feature ships with offline tests: recorded JSON fixtures in `Tests/.../Fixtures`, known-answer crypto vectors. Fixtures never contain tokens, cookies, activation bytes, customer IDs or download links: redact them.
 - Secrets (tokens, device keys, activation bytes) live in Keychain only. Never log them, and never log signed download URLs (aria2c output can contain them).
-- Never send account headers to download CDNs or depend on OpenAudible's licensed key service. See `docs/aax-conversion.md`.
+- Never send account headers to download CDNs or depend on any third party key service. See `docs/aax-conversion.md`.
 - Paths built from `books.json` or titles go through `OpenAudibleLibrary.url(for:)` (stays inside its folder) and `Book.fileName(_:fallback:)`. Only open files with an expected extension.
 - Views inside `Table` rows and context menus must not read `@Environment` objects (they crashed: AppKit hosts them outside the window tree); pass dependencies in (see `Cover`, `BookActions`).
 - Views shown/hidden inside a `NavigationSplitView` column (player bar, banners) must not raise the column's minimum width: give them `.frame(minWidth: 0, maxWidth: .infinity)`. A growing min size is applied mid constraint pass and crashes AppKit. Reproduce with `LECTERN_PLAY=1`.
