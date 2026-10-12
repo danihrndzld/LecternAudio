@@ -7,7 +7,24 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # Docs-only PRs skip the build jobs. The run still ends in success, so automerge (workflow_run) fires;
+  # paths-ignore would skip the whole run and the PR would never merge.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then echo code=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD")
+          if grep -qvE '\.md$|^docs/' <<< "$files"; then echo code=true; else echo code=false; fi >> "$GITHUB_OUTPUT"
   core-linux:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     container: swift:6.1
     steps:
@@ -18,8 +35,18 @@ jobs:
           path: Packages/AudibleCore/.build
           key: spm-linux-swift6.1-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
           restore-keys: spm-linux-swift6.1-
-      - run: swift test --package-path Packages/AudibleCore
-  macos:
+      - run: swift test --package-path Packages/AudibleCore --disable-index-store
+  # Tests and the app build run on separate runners in parallel (standard runners are free on public repos).
+  macos-test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path Packages/AudibleCore --disable-index-store
+  macos-build:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -31,11 +58,17 @@ jobs:
             build/ffmpeg-8.0
             build/aria2-1.37.0
           key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
+      # Package checkouts and the Sparkle binary, otherwise cloned and downloaded on every run.
+      - uses: actions/cache@v4
+        with:
+          path: build/SourcePackages
+          key: spm-xcode-${{ hashFiles('project.yml', 'Packages/AudibleCore/Package.resolved') }}
+          restore-keys: spm-xcode-
       - run: brew install xcodegen
       - run: xcodegen generate
-      - run: swift test --package-path Packages/AudibleCore
       - run: |
           universal=()
           if [ "$GITHUB_EVENT_NAME" = push ]; then universal=("ARCHS=arm64 x86_64" ONLY_ACTIVE_ARCH=NO); fi
-          xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build CODE_SIGNING_ALLOWED=NO "${universal[@]}" | tail -20
+          xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build -showBuildTimingSummary build \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO "${universal[@]}" | tail -80
         shell: bash -o pipefail {0}

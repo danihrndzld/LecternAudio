@@ -17,10 +17,10 @@ sparkle_bin="$root/build/SourcePackages/artifacts/sparkle/Sparkle/bin"
 cd "$root"
 
 settings=(MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number"
-    ARCHS="${ARCHS:-arm64 x86_64}" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO)
+    ARCHS="${ARCHS:-arm64 x86_64}" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO)
 if [ -n "${LECTERN_FEED_URL:-}" ]; then settings+=(LECTERN_FEED_URL="$LECTERN_FEED_URL"); fi
 xcodebuild -scheme LecternAudio -configuration Release -destination 'generic/platform=macOS' \
-    -derivedDataPath build "${settings[@]}" build | tail -3
+    -derivedDataPath build -showBuildTimingSummary "${settings[@]}" build | tail -60
 
 # Sign inside out, no --deep (Sparkle's sandboxing guide). Sparkle rejects an update whose nested signatures are broken.
 bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")

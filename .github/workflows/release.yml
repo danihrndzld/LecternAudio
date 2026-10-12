@@ -31,6 +31,11 @@ jobs:
             build/ffmpeg-8.0
             build/aria2-1.37.0
           key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
+      - uses: actions/cache/restore@v4
+        with:
+          path: build/SourcePackages
+          key: spm-xcode-${{ hashFiles('project.yml', 'Packages/AudibleCore/Package.resolved') }}
+          restore-keys: spm-xcode-
       - run: brew install xcodegen
       - run: xcodegen generate
       - name: Build, sign and package
