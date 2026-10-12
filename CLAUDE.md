@@ -19,7 +19,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
 ```
 - One test: `swift test --package-path Packages/AudibleCore --filter <testFunctionName>` (Swift Testing `@Test` functions).
 - The first app build compiles FFmpeg 8.0 and aria2 1.37.0 from checksum-pinned tarballs (`scripts/build-ffmpeg.sh`, `scripts/build-aria2.sh`, run as post-build scripts) and caches them under `build/`.
-- Release locally: `scripts/release.sh <version> <build>` builds a universal app, signs it ad-hoc inside out, makes the DMG and ZIP, and writes `appcast.xml` signed with the Sparkle EdDSA key (from `SPARKLE_PRIVATE_KEY` or the login Keychain). CI does the same on `v*` tags (`.github/workflows/release.yml`).
+- Release locally: `scripts/release.sh <version> <build>` builds an Apple silicon (arm64) app, signs it ad-hoc inside out, makes the DMG and ZIP, and writes `appcast.xml` signed with the Sparkle EdDSA key (from `SPARKLE_PRIVATE_KEY` or the login Keychain). CI does the same on `v*` tags (`.github/workflows/release.yml`).
 - Running tests rewrites `Packages/AudibleCore/Package.resolved` with a Sparkle pin; don't commit that churn unless dependencies changed.
 
 ## Architecture

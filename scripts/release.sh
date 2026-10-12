@@ -1,8 +1,8 @@
 #!/bin/bash
-# Builds a release: universal Lectern Audio.app, ad-hoc signed, as a DMG (for people) and a ZIP plus appcast.xml (for Sparkle).
+# Builds a release: Apple silicon Lectern Audio.app, ad-hoc signed, as a DMG (for people) and a ZIP plus appcast.xml (for Sparkle).
 # Usage: scripts/release.sh <version> <build-number>     e.g. scripts/release.sh 0.2.0 7
 # Env: SPARKLE_PRIVATE_KEY (EdDSA key; without it sign_update uses the login Keychain),
-#      TAG (default v<version>), ARCHS (default "arm64 x86_64"),
+#      TAG (default v<version>), ARCHS (default arm64; "x86_64" for an Intel build, "arm64 x86_64" for universal),
 #      LECTERN_FEED_URL and DOWNLOAD_URL_PREFIX (override for local update tests).
 set -euo pipefail
 
@@ -16,8 +16,9 @@ prefix="${DOWNLOAD_URL_PREFIX:-https://github.com/danihrndzld/LecternAudio/relea
 sparkle_bin="$root/build/SourcePackages/artifacts/sparkle/Sparkle/bin"
 cd "$root"
 
+archs="${ARCHS:-arm64}"
 settings=(MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number"
-    ARCHS="${ARCHS:-arm64 x86_64}" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO)
+    ARCHS="$archs" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO)
 if [ -n "${LECTERN_FEED_URL:-}" ]; then settings+=(LECTERN_FEED_URL="$LECTERN_FEED_URL"); fi
 xcodebuild -scheme LecternAudio -configuration Release -destination 'generic/platform=macOS' \
     -derivedDataPath build -showBuildTimingSummary "${settings[@]}" build | tail -60
@@ -59,6 +60,10 @@ ref=$(git rev-parse -q --verify "refs/tags/$tag" > /dev/null && echo "$tag" || e
 previous=$(git describe --tags --abbrev=0 "$ref^" 2> /dev/null || true)
 notes=$(git log --pretty='- %s' "${previous:+$previous..}$ref" | sed 's/]]>/]] >/g')
 
+# An Intel Mac with an older version must not be offered an arm64-only update it can't open.
+hardware=""
+if [[ " $archs " != *" x86_64 "* ]]; then hardware='<sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>'; fi
+
 cat > "$out/appcast.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
@@ -70,6 +75,7 @@ cat > "$out/appcast.xml" <<EOF
       <sparkle:version>$build_number</sparkle:version>
       <sparkle:shortVersionString>$version</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      $hardware
       <description sparkle:format="plain-text"><![CDATA[$notes]]></description>
       <enclosure url="$prefix/$name.zip" type="application/octet-stream" $signature />
     </item>

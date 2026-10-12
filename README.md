@@ -8,7 +8,7 @@
 
 [![Latest release](https://img.shields.io/github/v/release/danihrndzld/LecternAudio?style=flat-square&color=bf4520&label=release)](https://github.com/danihrndzld/LecternAudio/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/danihrndzld/LecternAudio/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/danihrndzld/LecternAudio/actions/workflows/ci.yml)
-[![macOS 26 or later](https://img.shields.io/badge/macOS-26%2B-555555?style=flat-square&logo=apple)](#install)
+[![macOS 26 or later, Apple silicon](https://img.shields.io/badge/macOS-26%2B%20Apple%20silicon-555555?style=flat-square&logo=apple)](#install)
 [![Swift 6](https://img.shields.io/badge/Swift-6-555555?style=flat-square&logo=swift)](#build-it-yourself)
 
 **[Download the latest version](https://github.com/danihrndzld/LecternAudio/releases/latest)**
@@ -44,7 +44,7 @@ Lectern Audio is for personal use with books you bought. It isn't affiliated wit
 
 ## Install
 
-Lectern Audio needs macOS 26 or later. The app isn't signed with an Apple Developer ID, so macOS asks you to confirm it the first time you open it.
+Lectern Audio needs a Mac with Apple silicon and macOS 26 or later. For a Mac with an Intel processor, [build it yourself](#build-it-for-an-intel-mac). The app isn't signed with an Apple Developer ID, so macOS asks you to confirm it the first time you open it.
 
 1. Download the `LecternAudio` DMG file from the [latest release](https://github.com/danihrndzld/LecternAudio/releases/latest).
 2. Open the DMG, and drag Lectern Audio to your Applications folder.
@@ -146,6 +146,19 @@ The tests run offline, because CI can't sign in to Audible. Network code is test
 
 </details>
 
+### Build it for an Intel Mac
+
+The releases run only on Apple silicon, but the code also builds for Intel. If you build on the Intel Mac itself, open the project in Xcode as shown above and run it, and Xcode builds for that Mac. To make a copy for an Intel Mac on any Mac, run these commands from the repository folder.
+
+```sh
+brew install xcodegen
+xcodegen generate
+xcodebuild -scheme LecternAudio -configuration Release -destination 'generic/platform=macOS' \
+    -derivedDataPath build ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO build
+```
+
+The app is in `build/Build/Products/Release`. Copy `Lectern Audio.app` to the Applications folder on the Intel Mac, and confirm it the first time you open it, as in [Install](#install). FFmpeg and aria2 are built for Intel too, so the first build takes a few minutes longer. Check for Updates doesn't offer the Apple silicon releases to an Intel Mac, so build again from the newest code to update.
+
 <details>
 <summary>Project layout</summary>
 
@@ -172,7 +185,7 @@ Add the `hold` label to a pull request to stop the automatic merge. The rules th
 <details>
 <summary>Releasing</summary>
 
-Push a tag that starts with `v`, e.g., `git tag v0.3.0 && git push origin v0.3.0`. The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for updates with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP, and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. `scripts/release.sh 0.3.0 1` builds the same files on your Mac with the key in your login Keychain.
+Push a tag that starts with `v`, e.g., `git tag v0.3.0 && git push origin v0.3.0`. The release workflow builds an Apple silicon app, packs it as a DMG and a ZIP, signs the ZIP for updates with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP, and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. `scripts/release.sh 0.3.0 1` builds the same files on your Mac with the key in your login Keychain, and `ARCHS="arm64 x86_64"` before it makes a universal app.
 
 </details>
 
