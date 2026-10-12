@@ -69,8 +69,11 @@ public enum AudibleContent {
 
     public static func license(from data: Data, asin: String, account: AudibleAccount) throws -> AudibleContentLicense {
         guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let license = envelope["content_license"] as? [String: Any],
-              license["status_code"] as? String == "Granted", license["asin"] as? String == asin else {
+              let license = envelope["content_license"] as? [String: Any] else {
+            throw AudibleError("Audible did not grant a download license for this book.")
+        }
+        guard license["status_code"] as? String == "Granted" else { throw AudibleError(denialMessage(license)) }
+        guard license["asin"] as? String == asin else {
             throw AudibleError("Audible did not grant a download license for this book.")
         }
         guard let customer = account.customerID, !customer.isEmpty else {
@@ -101,6 +104,33 @@ public enum AudibleContent {
             return Chapter(title: chapter["title"] as? String ?? "", startMs: start, lengthMs: length)
         }
         return AudibleContentLicense(url: url, credentials: try .aaxc(key: key, iv: iv), chapters: chapters)
+    }
+
+    /// Why Audible refused a license. Audible runs one check per `validationType` (`Ownership`, `Membership`,
+    /// `AYCL` for the Audible Plus catalog, `Client` for the device) and lists each failed one in
+    /// `license_denial_reasons` with a `rejectionReason`. Audible's own `message` can name the customer,
+    /// so only the check and reason codes are shown.
+    static func denialMessage(_ license: [String: Any]) -> String {
+        let reasons = (license["license_denial_reasons"] as? [[String: Any]] ?? []).compactMap { reason -> (type: String, reason: String)? in
+            guard let rejection = reason["rejectionReason"] as? String, !rejection.isEmpty else { return nil }
+            return (reason["validationType"] as? String ?? "", rejection)
+        }
+        let types = Set(reasons.map(\.type))
+        let explanation = if reasons.contains(where: { $0.reason == "CustomerThrottled" }) {
+            "Audible is limiting downloads for this account right now. Wait a day or two, then choose Retry."
+        } else if reasons.isEmpty || reasons.contains(where: { $0.reason == "GenericError" }) {
+            "Audible refused the download license without a reason, which usually means a temporary problem at Audible. Choose Retry later."
+        } else if types.contains("Client") {
+            "Audible doesn't accept this Mac's sign-in for this book. Sign out in Settings, sign in again, then choose Retry."
+        } else if types.contains("Membership") || types.contains("AYCL") {
+            "This book came with an Audible membership or Audible Plus, not a purchase. Audible no longer lets this account download it, because the membership ended or the book left the Plus catalog. It still appears in your Audible library."
+        } else if types.contains("Ownership") {
+            "Your Audible account doesn't own this book anymore, for example because it was returned. It still appears in your Audible library."
+        } else {
+            "Audible did not grant a download license for this book."
+        }
+        let codes = reasons.map { $0.type.isEmpty ? $0.reason : "\($0.type) \($0.reason)" }
+        return codes.isEmpty ? explanation : "\(explanation) (Audible: \(codes.joined(separator: ", ")))"
     }
 
     public static func validASIN(_ asin: String) -> Bool {
