@@ -208,3 +208,13 @@ func encryptedAAXConvertsAndRejectsWrongKey() async throws {
     }
     #expect(!FileManager.default.fileExists(atPath: rejected.path))
 }
+
+@Test func aaxIsTrashedOnlyWhenTheOutputHasTheBooksFullLength() {
+    #expect(AAXConverter.durationMatches(36_030.5, expected: 36_000))   // Audible rounds to whole minutes
+    #expect(AAXConverter.durationMatches(35_910, expected: 36_000))
+    #expect(!AAXConverter.durationMatches(35_000, expected: 36_000))   // truncated
+    #expect(!AAXConverter.durationMatches(nil, expected: 36_000))      // unreadable output
+    #expect(!AAXConverter.durationMatches(.nan, expected: 36_000))
+    #expect(!AAXConverter.durationMatches(0, expected: 36_000))
+    #expect(!AAXConverter.durationMatches(60, expected: 0))            // length unknown
+}

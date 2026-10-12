@@ -49,6 +49,10 @@ final class LibraryModel {
     private(set) var convertibleCount = 0
     /// Books still waiting in a Convert All to M4B run.
     private var conversionBatch: [Book] = []
+    /// The run was started by a sync, not from the menu: it continues past a book that fails.
+    private var automaticBatch = false
+    /// Books whose conversion failed since launch; automatic runs skip them instead of retrying each sync.
+    private var failedConversions: Set<Book.ID> = []
     @ObservationIgnored var jobs: [UUID: Task<Void, Never>] = [:] { didSet { jobCount = jobs.count } }
     let conversion = ConversionModel()
     let downloads = DownloadModel()
@@ -140,7 +144,9 @@ final class LibraryModel {
                 audibleBooks = fetched
                 lastSync = .now
                 AppLog.shared.info("Synced \(fetched.count) books from Audible")
-                if downloads.automaticallyDownload { downloads.enqueue(books, userInitiated: false) }
+                // Books with a local AAX are left to the conversion below instead of downloaded again.
+                if downloads.automaticallyDownload { downloads.enqueue(LibraryJobs.downloadable(books, owned: Set(fetched.map(\.asin))), userInitiated: false) }
+                if UserDefaults.standard.bool(forKey: Prefs.autoConvert) { convertAll(automatic: true) }
             } catch let error where error is CancellationError || Task.isCancelled {
             } catch {
                 if syncGeneration == generation { syncError = error.localizedDescription; AppLog.shared.error("Sync failed: \(error.localizedDescription)") }
@@ -153,6 +159,11 @@ final class LibraryModel {
 
     func canDownload(_ book: Book) -> Bool {
         accountIdentity != nil && audibleBooks.contains { $0.asin == book.asin } && !book.hasAudio
+    }
+
+    /// Whether the book is in the synced Audible list of the signed-in account.
+    func isInAccount(_ book: Book) -> Bool {
+        !book.asin.isEmpty && audibleBooks.contains { $0.asin == book.asin }
     }
 
     func convert(_ book: Book) {
@@ -176,23 +187,37 @@ final class LibraryModel {
     /// another. Books whose activation bytes would have to be typed are left out, so the run never
     /// stops waiting for input, and a failure or a cancel stops the rest. Books whose AAX is missing
     /// on disk or whose M4B already exists in books/Earmark are skipped up front.
-    func convertAll() {
+    ///
+    /// `automatic` is a run started by a sync: it doesn't ask, doesn't show the conversion sheet (its
+    /// outcomes go to the Log Window), skips books that already failed since launch and continues past
+    /// a failing book. It still stops when activation fails or Cancel All Jobs is chosen.
+    func convertAll(automatic: Bool = false) {
         guard let session, session.account != nil, !conversion.isRunning, let folder = library else { return }
+        // A sheet still open for a manual conversion (waiting for typed activation bytes) keeps its book.
+        if automatic && conversion.book != nil { return }
         let manager = FileManager.default
         let books = LibraryJobs.convertible(books, owned: Set(audibleBooks.map(\.asin))).filter { book in
+            if automatic && failedConversions.contains(book.id) { return false }
             guard let input = folder.aaxURL(for: book), manager.isReadableFile(atPath: input.path),
                   let output = folder.conversionOutput(for: book) else { return false }
             return !manager.fileExists(atPath: output.path)
         }
         guard !books.isEmpty else {
+            if automatic { return }
             NSAlert(error: AudibleError("Nothing to convert. Every AAX file is missing on disk or already has an M4B in books/Earmark.")).runModal()
             return
         }
-        guard confirm("Convert \(books.count) \(books.count == 1 ? "book" : "books") to M4B?",
+        guard automatic || confirm("Convert \(books.count) \(books.count == 1 ? "book" : "books") to M4B?",
                       "The conversion window stays open until the last book is done. Cancel stops the rest.",
                       button: "Convert") else { return }
+        // A sync may have started an automatic run while the alert was open.
+        guard !conversion.isRunning else {
+            AppLog.shared.info("Convert All to M4B: an automatic conversion started first; choose it again when it is done")
+            return
+        }
         conversionBatch = books
-        AppLog.shared.info("Convert All to M4B: \(conversionBatch.count) book(s)")
+        automaticBatch = automatic
+        AppLog.shared.info("\(automatic ? "Automatic conversion" : "Convert All to M4B"): \(conversionBatch.count) book(s)")
         convertNext()
     }
 
@@ -211,16 +236,22 @@ final class LibraryModel {
             return
         }
         let next = conversionBatch.removeFirst()
-        conversion.onFinish = { [weak self] succeeded in
+        conversion.onFinish = { [weak self] outcome in
             guard let self else { return }
-            if succeeded { convertNext() } else { stopConversionBatch() }
+            if outcome == .failed { failedConversions.insert(next.id) }
+            if outcome != .converted {
+                AppLog.shared.error("Could not convert \(next.title): \(conversion.message ?? "unknown error")")
+            }
+            if outcome == .converted || (automaticBatch && outcome == .failed) { convertNext() } else { stopConversionBatch() }
         }
-        conversion.prepare(next, session: session, library: self)
+        conversion.prepare(next, session: session, library: self, automatic: automaticBatch)
     }
 
     private func stopConversionBatch() {
         conversionBatch = []
         conversion.onFinish = nil
+        // The hidden sheet's book is cleared so a later manual conversion shows its own sheet.
+        if automaticBatch { automaticBatch = false; conversion.dismiss() }
     }
 
     func audioURL(for book: Book) -> URL? {
@@ -327,7 +358,8 @@ final class LibraryModel {
     /// Controls ▸ Cancel All Jobs, through each job's own cancel API.
     func cancelAllJobs() {
         syncTask?.cancel()
-        stopConversionBatch()
+        // The cancelled conversion reports `.stopped`, which ends the run once it has stopped.
+        conversionBatch = []
         conversion.cancel()
         for job in downloads.jobs where [.queued, .licensing, .downloading, .converting].contains(job.state) { downloads.cancel(job.id) }
         exports.cancelAll()

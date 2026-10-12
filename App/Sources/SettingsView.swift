@@ -13,6 +13,9 @@ enum Prefs {
     static let autoSync = "autoSync"
     static let autoSyncHours = "autoSyncHours"
     static let showProgress = "showProgress"
+    static let autoConvert = "autoConvert"
+    /// Moves the AAX file (downloaded by OpenAudible) to the Trash after a verified conversion, so it defaults off.
+    static let deleteAAXAfterConversion = "deleteAAXAfterConversion"
     static let language = "language"  // "" follows the system
     static let appearance = "appearance"  // "system", "light", "dark"
     static let tableFontSize = "tableFontSize"  // "small", "medium", "large"
@@ -142,6 +145,8 @@ private struct GeneralSettings: View {
     @AppStorage(Prefs.autoSync) private var autoSync = true
     @AppStorage(Prefs.autoSyncHours) private var autoSyncHours = 24
     @AppStorage(Prefs.showProgress) private var showProgress = false
+    @AppStorage(Prefs.autoConvert) private var autoConvert = false
+    @AppStorage(Prefs.deleteAAXAfterConversion) private var deleteAAX = false
     /// Sparkle's own defaults key, read only so the toggle redraws; writes go through the updater.
     @AppStorage("SUEnableAutomaticChecks") private var automaticUpdateChecks = true
     @AppStorage(Prefs.language) private var language = ""
@@ -184,6 +189,10 @@ private struct GeneralSettings: View {
             Section("Automation") {
                 Toggle("Refresh library on launch", isOn: $refreshOnLaunch)
                 Toggle("Show progress automatically when downloads start", isOn: $showProgress)
+                Toggle("Automatically convert AAX files after syncing", isOn: $autoConvert)
+                Toggle("Move AAX files to the Trash after converting them", isOn: $deleteAAX)
+                Text("Moves AAX files that OpenAudible downloaded to the Trash after a verified conversion, for books in your Audible account. OpenAudible will show them as missing.")
+                    .font(.callout).foregroundStyle(.secondary)
                 Toggle(isOn: $autoSync) {
                     Stepper("Sync with Audible every \(autoSyncHours) hours", value: $autoSyncHours, in: 1...168)
                 }

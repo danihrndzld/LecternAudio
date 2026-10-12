@@ -107,6 +107,15 @@ public actor AAXConverter {
 
     public init() {}
 
+    /// Whether a converted M4B's full duration matches the book's, which the app requires before it
+    /// moves the AAX to the Trash: `validate` decodes only the first second, so a truncated output
+    /// could pass it. Audible reports runtime in whole minutes (`runtime_length_min * 60`), hence
+    /// 90 seconds of tolerance; an unknown duration on either side never matches.
+    public static func durationMatches(_ actual: Double?, expected seconds: Int) -> Bool {
+        guard let actual, actual.isFinite, actual > 0, seconds > 0 else { return false }
+        return abs(actual - Double(seconds)) <= 90
+    }
+
     public func convert(_ request: AAXConversionRequest, activationBytes: ActivationBytes, ffmpeg: URL,
                         progress: @escaping @Sendable (Double) -> Void = { _ in }) async throws -> URL {
         try await convert(request, credentials: .aax(activationBytes), ffmpeg: ffmpeg, progress: progress)

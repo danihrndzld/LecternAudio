@@ -1,3 +1,4 @@
+import AVFoundation
 import AppKit
 import AudibleCore
 import Observation
@@ -15,9 +16,16 @@ final class ConversionModel {
     private let converter = AAXConverter()
     private var task: Task<Void, Never>?
     private(set) var usesAccountKey = false
+    /// Started by a sync (Settings ▸ Automatically convert AAX files after syncing), not by the user,
+    /// so the modal conversion sheet stays hidden and outcomes go to the Log Window.
+    private(set) var isAutomatic = false
+
+    /// How a conversion ended. `stopped` (activation failed, cancelled, no ffmpeg, invalid key) applies
+    /// to every book of the run; `failed` is about this book only.
+    enum Outcome { case converted, failed, stopped }
     /// Called with the outcome when a conversion ends, so `LibraryModel` can run a whole library's
     /// worth of AAX files one after another (Controls ▸ Convert All to M4B). Cleared when it stops.
-    @ObservationIgnored var onFinish: ((Bool) -> Void)?
+    @ObservationIgnored var onFinish: ((Outcome) -> Void)?
 
     var ffmpegURL: URL? {
         Bundle.main.executableURL?.deletingLastPathComponent().deletingLastPathComponent()
@@ -27,6 +35,7 @@ final class ConversionModel {
     func prepare(_ book: Book) {
         guard !isRunning else { return }
         onFinish = nil
+        isAutomatic = false
         self.book = book
         usesAccountKey = false
         activationBytes = ""
@@ -37,8 +46,9 @@ final class ConversionModel {
         catch { message = error.localizedDescription }
     }
 
-    func prepare(_ book: Book, session: AudibleSession, library: LibraryModel) {
+    func prepare(_ book: Book, session: AudibleSession, library: LibraryModel, automatic: Bool = false) {
         guard !isRunning else { return }
+        isAutomatic = automatic
         self.book = book
         activationBytes = ""
         usesAccountKey = true
@@ -62,7 +72,7 @@ final class ConversionModel {
                 task = nil
                 message = (error as? AudibleError)?.message ?? "Could not activate this account. Sign in again or retry."
                 // Activation fails for every book of this account, so a batch must stop here.
-                onFinish?(false)
+                onFinish?(.stopped)
             }
         }
     }
@@ -73,12 +83,12 @@ final class ConversionModel {
         // for the next manual conversion.
         guard let book, let library = libraryModel.library,
               let input = library.aaxURL(for: book), let output = library.conversionOutput(for: book) else {
-            onFinish?(false)
+            onFinish?(.failed)
             return
         }
         guard let ffmpegURL else {
             message = "The bundled conversion tool is missing. Rebuild or reinstall Lectern Audio."
-            onFinish?(false)
+            onFinish?(.stopped)
             return
         }
         let key: ActivationBytes
@@ -90,7 +100,7 @@ final class ConversionModel {
             }
         } catch {
             message = error.localizedDescription
-            onFinish?(false)
+            onFinish?(.stopped)
             return
         }
         activationBytes = ""
@@ -102,9 +112,13 @@ final class ConversionModel {
             url.isFileURL && FileManager.default.isReadableFile(atPath: url.path) ? url : nil
         }
         let request = AAXConversionRequest(input: input, output: output, book: book, cover: cover)
+        // Only an AAX of a book still in the signed-in account goes to the Trash: Audible can replace
+        // it. A manual conversion with typed activation bytes may be converting the only copy left.
+        let trashAAX = UserDefaults.standard.bool(forKey: Prefs.deleteAAXAfterConversion)
+            && usesAccountKey && libraryModel.isInAccount(book)
         task = Task { [self] in
-            // `succeeded` and `message` are set by the time this runs, so a batch can read the outcome.
-            defer { isRunning = false; task = nil; onFinish?(succeeded) }
+            var outcome = Outcome.failed
+            defer { isRunning = false; task = nil; onFinish?(outcome) }
             do {
                 // Shares the limit with the download queue's conversions (Settings, Simultaneous conversions).
                 let converted = try await Prefs.conversions.run { [converter] in
@@ -120,16 +134,38 @@ final class ConversionModel {
                     try? FileManager.default.removeItem(at: converted)
                     throw error
                 }
+                // Only once `recordConversion` has registered the M4B that replaces it.
+                let kept = trashAAX ? await moveToTrash(input, convertedTo: converted, seconds: book.seconds) : nil
                 if libraryModel.library?.root == library.root { libraryModel.reload() }
                 progress = 1
                 succeeded = true
+                outcome = .converted
                 Prefs.playCompletionSound()
-                message = "Saved to books/Earmark/\(converted.lastPathComponent)"
+                message = "Saved to books/Earmark/\(converted.lastPathComponent)" + (kept.map { ". \($0)" } ?? "")
             } catch is CancellationError {
+                outcome = .stopped
                 message = "Conversion cancelled. Your AAX file is unchanged."
             } catch {
                 message = error.localizedDescription
             }
+        }
+    }
+
+    /// Moves the AAX to the Trash once the M4B's full duration matches the book's, and says in the
+    /// sheet what happened to it. A failure keeps the AAX; it never fails the conversion.
+    private func moveToTrash(_ aax: URL, convertedTo output: URL, seconds: Int) async -> String? {
+        let duration = try? await AVURLAsset(url: output).load(.duration).seconds
+        guard AAXConverter.durationMatches(duration, expected: seconds) else {
+            AppLog.shared.error("Kept \(aax.lastPathComponent): the M4B lasts \(duration.map { "\(Int($0)) s" } ?? "an unknown time"), the book \(seconds) s")
+            return "The AAX file was kept because the M4B's length could not be confirmed."
+        }
+        do {
+            try FileManager.default.trashItem(at: aax, resultingItemURL: nil)
+            AppLog.shared.info("Moved \(aax.lastPathComponent) to the Trash after converting it")
+            return "The AAX file was moved to the Trash."
+        } catch {
+            AppLog.shared.error("Could not move \(aax.lastPathComponent) to the Trash: \(error.localizedDescription)")
+            return "The AAX file was kept: \(error.localizedDescription)"
         }
     }
 
@@ -139,6 +175,7 @@ final class ConversionModel {
         guard !isRunning else { return }
         activationBytes = ""
         book = nil
+        isAutomatic = false
     }
 }
 

@@ -109,7 +109,7 @@ struct ContentView: View {
         .fileImporter(isPresented: $model.isPickingFolder, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result { model.open(url) }
         }
-        .sheet(isPresented: Binding(get: { model.conversion.book != nil }, set: { if !$0 { model.conversion.dismiss() } })) {
+        .sheet(isPresented: Binding(get: { model.conversion.book != nil && !model.conversion.isAutomatic }, set: { if !$0 { model.conversion.dismiss() } })) {
             ConversionView(conversion: model.conversion, library: model)
         }
     }
