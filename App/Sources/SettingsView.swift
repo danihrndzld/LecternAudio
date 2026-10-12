@@ -21,6 +21,8 @@ enum Prefs {
     static let playerApp = "playerApp"
     static let browserApp = "browserApp"
     static let fileManagerApp = "fileManagerApp"
+    static let maxDownloads = "maxDownloads"
+    static let maxConversions = "maxConversions"
     static let aria2 = "aria2"
     static let aria2Connections = "aria2Connections"
     static let aria2Split = "aria2Split"
@@ -32,6 +34,7 @@ enum Prefs {
         UserDefaults.standard.register(defaults: [
             outputFormat: "m4b", mp3Bitrate: 320, oggQuality: 10, refreshOnLaunch: true, autoSync: true, autoSyncHours: 24,
             appearance: "system", tableFontSize: "medium",
+            maxDownloads: DownloadQueue.defaultDownloads, maxConversions: DownloadQueue.defaultConversions,
             aria2Connections: 16, aria2Split: 16, aria2MinSplitMiB: 1, aria2MaxSpeedMBps: 0,
         ])
     }
@@ -75,6 +78,20 @@ enum Prefs {
                 throw error
             }
         }
+    }
+
+    static var downloadConcurrency: Int {
+        UserDefaults.standard.integer(forKey: maxDownloads)
+    }
+
+    /// One limiter for every FFmpeg conversion in the app. Download jobs convert inside the job, so
+    /// without a shared limit the conversion setting could only ever be as coarse as the download
+    /// setting (issue #18).
+    static let conversions = ConcurrencyLimiter(limit: DownloadQueue.defaultConversions)
+
+    static func applyConversionLimit() {
+        let limit = UserDefaults.standard.integer(forKey: maxConversions)
+        Task { await conversions.setLimit(limit) }
     }
 
     static func playCompletionSound() {
@@ -207,7 +224,10 @@ private struct GeneralSettings: View {
 }
 
 private struct AdvancedSettings: View {
+    @Environment(LibraryModel.self) private var library
     @AppStorage(Prefs.externalPlayer) private var externalPlayer = false
+    @AppStorage(Prefs.maxDownloads) private var maxDownloads = DownloadQueue.defaultDownloads
+    @AppStorage(Prefs.maxConversions) private var maxConversions = DownloadQueue.defaultConversions
     @AppStorage(Prefs.aria2) private var aria2 = false
     @AppStorage(Prefs.aria2Connections) private var connections = 16
     @AppStorage(Prefs.aria2Split) private var split = 16
@@ -221,6 +241,14 @@ private struct AdvancedSettings: View {
                 AppPicker(title: "Audio player", key: Prefs.playerApp)
                 AppPicker(title: "Web browser", key: Prefs.browserApp)
                 AppPicker(title: "File manager", key: Prefs.fileManagerApp)
+            }
+            Section("Concurrent Jobs") {
+                Stepper("Simultaneous downloads: \(maxDownloads)", value: $maxDownloads, in: DownloadQueue.concurrencyRange)
+                    .onChange(of: maxDownloads) { library.downloads.advance() }
+                Stepper("Simultaneous conversions: \(maxConversions)", value: $maxConversions, in: DownloadQueue.concurrencyRange)
+                    .onChange(of: maxConversions) { Prefs.applyConversionLimit() }
+                Text("Downloads mostly wait on the network. Conversions copy the audio stream, so they mostly wait on the disk. A download that is ready to convert waits for a conversion slot, so setting conversions far below downloads leaves downloads idle.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             Section("Downloads") {
                 Toggle("Use aria2c for faster downloads", isOn: $aria2).disabled(!AppInfo.aria2Bundled)

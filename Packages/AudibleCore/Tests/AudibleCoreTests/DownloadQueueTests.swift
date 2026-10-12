@@ -80,3 +80,47 @@ private func job(_ asin: String = "B0000001", state: DownloadJob.State) -> Downl
     // "B0000001" must not collect "B00000010-…": the separator is part of the prefix.
     #expect(DownloadQueue.sources(for: "B0000001", in: ["B00000010-abc.aaxc"]).isEmpty)
 }
+
+// MARK: - Several downloads at a time (issue #18)
+
+@Test func startsUpToTheDownloadLimitInOrder() {
+    let jobs = [job("B01", state: .queued), job("B02", state: .queued), job("B03", state: .queued)]
+    #expect(DownloadQueue.next(jobs, limit: 2).count == 2)
+    #expect(DownloadQueue.next(jobs, limit: 2) == [jobs[0].id, jobs[1].id])
+    #expect(DownloadQueue.next(jobs, limit: 1).count == 1)
+}
+
+@Test func runningDownloadsCountTowardTheLimit() {
+    let jobs = [job("B01", state: .downloading), job("B02", state: .licensing), job("B03", state: .queued)]
+    #expect(DownloadQueue.next(jobs, limit: 2).isEmpty, "two are already in flight")
+    #expect(DownloadQueue.next(jobs, limit: 3).count == 1)
+}
+
+@Test func finishedDownloadsDoNotHoldASlot() {
+    let jobs = [job("B01", state: .complete), job("B02", state: .failed), job("B03", state: .cancelled),
+                job("B04", state: .queued)]
+    #expect(DownloadQueue.next(jobs, limit: 1).count == 1)
+}
+
+@Test func theDownloadLimitIsClamped() {
+    let jobs = (1...12).map { job(String(format: "B%03d", $0), state: .queued) }
+    #expect(DownloadQueue.next(jobs, limit: 0).count == 1, "below the range behaves as one")
+    #expect(DownloadQueue.next(jobs, limit: -3).count == 1)
+    #expect(DownloadQueue.next(jobs, limit: 99).count == DownloadQueue.concurrencyRange.upperBound,
+            "above the range is capped, never unbounded")
+}
+
+@Test func aJobWithALiveTaskKeepsItsSlotAndIsNotStartedTwice() {
+    // Cancel then Retry: the job is queued again while its old task is still unwinding.
+    let jobs = [job("B01", state: .queued), job("B02", state: .queued)]
+    #expect(DownloadQueue.next(jobs, live: [jobs[0].id], limit: 1).isEmpty, "the unwinding task holds the only slot")
+    #expect(DownloadQueue.next(jobs, live: [jobs[0].id], limit: 2) == [jobs[1].id], "never a second task for B01")
+    // A cancelled job whose task is unwinding still counts.
+    let cancelled = [job("B01", state: .cancelled), job("B02", state: .queued)]
+    #expect(DownloadQueue.next(cancelled, live: [cancelled[0].id], limit: 1).isEmpty)
+}
+
+@Test func nothingQueuedStartsNoDownloads() {
+    #expect(DownloadQueue.next([], limit: 3).isEmpty)
+    #expect(DownloadQueue.next([job("B01", state: .complete)], limit: 3).isEmpty)
+}

@@ -28,6 +28,26 @@ public enum DownloadQueue {
         [.licensing, .downloading, .converting].contains(state)
     }
 
+    /// How many downloads may run at once by default: one, the serial behavior from before Settings
+    /// offered more, until parallel licensing has been tried on a real account (issue #18).
+    public static let defaultDownloads = 1
+    /// How many conversions may run at once by default. The AAXC to M4B step is a stream copy, mostly
+    /// bound by the disk, so a few at once are cheap.
+    public static let defaultConversions = 3
+    public static let concurrencyRange = 1...10
+
+    /// The jobs to start now: queued jobs in order, up to the limit, counting those already running.
+    ///
+    /// `live` holds the jobs that still have a task, including one that was cancelled and is still
+    /// unwinding (aria2c can take seconds to stop). Such a job keeps its slot, and if Retry has
+    /// already queued it again it is not started a second time; its task's exit starts it instead.
+    public static func next(_ jobs: [DownloadJob], live: Set<DownloadJob.ID> = [], limit: Int) -> [DownloadJob.ID] {
+        let running = live.union(jobs.filter { isRunning($0.state) }.map(\.id)).count
+        let free = max(0, min(max(limit, 1), concurrencyRange.upperBound) - running)
+        guard free > 0 else { return [] }
+        return jobs.filter { $0.state == .queued && !live.contains($0.id) }.prefix(free).map(\.id)
+    }
+
     /// Whether `enqueue` may replace an existing job for the same book with a fresh `.queued` one.
     ///
     /// Retry and the other explicit actions reset a job that has finished one way or another.

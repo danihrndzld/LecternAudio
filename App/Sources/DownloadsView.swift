@@ -17,8 +17,8 @@ struct DownloadsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(job.book.title).lineLimit(2)
                         Text(job.message ?? job.state.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
-                        if downloads.activeID == job.id {
-                            if let progress = downloads.progress { ProgressView(value: progress) }
+                        if DownloadQueue.isRunning(job.state) {
+                            if let progress = downloads.progress[job.id] { ProgressView(value: progress) }
                             else { ProgressView().controlSize(.small) }
                         }
                     }

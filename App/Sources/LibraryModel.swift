@@ -63,6 +63,8 @@ final class LibraryModel {
 
     init() {
         Prefs.register()
+        // The limiter is created with the default, so apply the stored setting before any job runs.
+        Prefs.applyConversionLimit()
         exports.run = { [weak self] job, progress in
             guard let self else { throw CancellationError() }
             try await runExport(job, progress: progress)

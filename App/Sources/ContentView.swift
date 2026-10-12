@@ -96,8 +96,8 @@ struct ContentView: View {
             }
         }
         .task(id: autoSyncID) { await autoSyncLoop() }
-        .onChange(of: model.downloads.activeID) { old, new in
-            if showProgress, old == nil, new != nil { showDownloads = true }
+        .onChange(of: model.downloads.activeCount) { old, new in
+            if showProgress, old == 0, new > 0 { showDownloads = true }
         }
         .onChange(of: appearance, initial: true) { _, new in applyAppearance(new) }
         .sheet(isPresented: $showDownloads) { DownloadsView(downloads: model.downloads, library: model) }

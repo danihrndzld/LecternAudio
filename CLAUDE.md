@@ -28,7 +28,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
 - `App/Sources`: SwiftUI app, MainActor by default. `@Observable` models created in `LecternAudioApp`:
   - `LibraryModel` merges the OpenAudible folder with the synced Audible list (`AudibleLibrary.merge`: Audible supplies list and metadata, the folder supplies files), owns security-scoped access to the folder and imports, and exposes the cached `LibraryIndex` (filtered and sorted books, sidebar counts, genres).
   - `AudibleSession` handles sign-in (WKWebView to Amazon, PKCE, device registration), Keychain storage and token refresh.
-  - `DownloadModel` runs a serial persisted queue (licensing, downloading, converting); `ConversionModel` converts local AAX files. Both shell out to the bundled `ffmpeg` helper. Known queue bugs are tracked in issue #31.
+  - `DownloadModel` runs a persisted queue (licensing, downloading, converting) with `Prefs.downloadConcurrency` jobs in flight; `ConversionModel` converts local AAX files. Every FFmpeg conversion in the app goes through the shared `Prefs.conversions` limiter, so Settings bounds conversions independently of downloads. Both shell out to the bundled `ffmpeg` helper.
   - `Player` wraps AVPlayer with chapters, Now Playing and saved positions.
   - `AppCommands` builds every menu; models are passed in explicitly. `SettingsView` holds `Prefs` keys and the settings panes.
 - Bundled helpers live in `Contents/Helpers` (`ffmpeg`, `aria2c`) with `inherit` sandbox entitlements (`App/FFmpeg.entitlements`, `App/Aria2.entitlements`); run alone they crash at sandbox init, which is expected. aria2c gets the signed URL on stdin, never in argv.
