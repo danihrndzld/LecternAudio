@@ -23,7 +23,7 @@
 
 <br>
 
-Lectern Audio replaces OpenAudible, which is a Java app, with an app written in Swift and SwiftUI. It uses the standard macOS sidebar, table, menus, and Now Playing controls, and it reads your existing OpenAudible folder, so you can switch without starting over.
+Lectern Audio is written in Swift and SwiftUI for the Mac only, so it uses the standard macOS sidebar, table, menus, and Now Playing controls. Other apps such as OpenAudible and Libation also manage Audible libraries on several platforms. If you already keep your books in an OpenAudible library folder, Lectern Audio can open that folder, so you can switch without starting over.
 
 Lectern Audio is for personal use with books you bought. It isn't affiliated with Audible or Amazon.
 
@@ -151,7 +151,7 @@ The tests run offline, because CI can't sign in to Audible. Network code is test
 
 - `Packages/AudibleCore` holds the models, the OpenAudible import, the Audible sign in and library code, the MP3 and Ogg Vorbis encoders, and their tests. It builds on Linux as well as macOS, so it doesn't import AppKit or SwiftUI.
 - `App/Sources` holds the app, including the windows, the player, the settings, and the download queue.
-- `docs` holds the OpenAudible feature list, the design decision record, the conversion notes, and the lessons learned.
+- `docs` holds the design decision record, the conversion notes, and the lessons learned.
 - `scripts` holds the FFmpeg and aria2 build scripts and the release script.
 
 </details>

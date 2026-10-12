@@ -1,34 +1,12 @@
 # AAX → M4B conversion
 
-## Observed OpenAudible behavior
+## Sources
 
-Inspected the installed OpenAudible 5.0.1 package on 2026-10-11. REA identified the Java launcher and the ZIP/JAR payload:
-
-- Artifact: `/Applications/OpenAudible.app/Contents/Resources/app/openaudible_mac_universal.jar`
-- SHA-256: `6f3b3189e6acd2125dc57d710a591896a0a032ef733dbe02c31d1f101e09f753`
-- REA inventory reference: `ev_fe79258769b302ecc67ef28f1d9d3c811b4e7d03710033b4d179f28af6474bbf`. The full inventory exceeded the MCP transport limit. Its contents were not used to infer conversion behavior.
-- Focused static evidence: `javap -p -c` for `org.openaudible.convert.ConvertJob` and `org.openaudible.convert.LookupKey` from that JAR. This inspected bytecode; it did not execute OpenAudible or contact its key service.
-
-`ConvertJob.getM4AArgs` uses `-c:a copy` for AAX/AAXC, maps audio/artwork, adds `-movflags +faststart` and `media_type=2`. Its shared argument builder puts `-activation_bytes` before the AAX input and uses a metadata input for chapters. It selects metadata chapters when the book has a chapter list, otherwise the source chapters. Artwork is an attached picture. This confirms lossless remuxing rather than AAC re-encoding.
-
-`LookupKey.lookupKey` first checks its checksum-indexed cache, then calls `remoteLookup`; the path also checks OpenAudible license membership. Lectern Audio does not reproduce this service or its licensing behavior. The existing `openaudible-spec.md` contains the wider investigation, including earlier observations of staging output and key lookup.
-
-The implementation is independently written against the public [FFmpeg AAX demuxer documentation](https://ffmpeg.org/ffmpeg-formats.html#Audible-AAX) and [FFmpeg command documentation](https://ffmpeg.org/ffmpeg.html). No OpenAudible or GPL conversion code is copied.
+The implementation is independently written against the public [FFmpeg AAX demuxer documentation](https://ffmpeg.org/ffmpeg-formats.html#Audible-AAX) and [FFmpeg command documentation](https://ffmpeg.org/ffmpeg.html). Conversion copies the audio without re-encoding, keeps the chapters, and attaches the cover. Lectern Audio doesn't use any third party key service, and no GPL conversion code is copied.
 
 ## Lectern Audio behavior
 
-### Historical gap: account-driven automation
-
-The initial key field and per-book Keychain entry were a Lectern Audio implementation shortcut, not OpenAudible's user flow. The account-driven workflow described below now replaces that prompt for signed-in library books; manual keys remain available for standalone local imports.
-
-A follow-up inspection on 2026-10-11 established:
-
-- `LookupKey.remoteLookup(hash, license)` builds `{serverBase}/api/hash/{hash}/{license}?version=5.0.1`. `lookupKey` tries the local cache first, then this service. Amazon sign-in and OpenAudible's AAX key service are distinct parts of its automatic workflow.
-- `API.getLicenseForBook(asin, quality)` obtains the AAXC content response, extracts its URL and codec, and calls `_decrypt_voucher_from_aaxc_response`. `DownloadAAXJob.postProcessAAXC` writes the obtained key/IV voucher to the downloaded file. These are per-content credentials managed internally, not fields the user fills in.
-- The installed `GetActivationBytes.extract_activation_bytes` ends by throwing `Exception("Unimplemented")`. Its presence is not evidence that OpenAudible uses a working direct-Audible activation implementation.
-- An independent account-based implementation is available as protocol reference in the MIT-licensed [Audible library](https://github.com/mkb79/Audible): `activation_bytes.py` retrieves activation data using registered-device signing, while `aescipher.py` decodes AAXC vouchers. These reference paths were inspected, not tested against the user's live account.
-
-For this follow-up, REA's `open_jeb_project` returned `capability_unavailable` because no JEB MCP engine was running. The method observations above come from focused `javap -p -c` / `-v` inspection of the same installed JAR, not successful REA Java decompilation. No account tokens, license codes or content keys were read or sent to a server.
+### Account-driven automation
 
 The product flow is account sign-in → library sync → authorized download → automatic key resolution → conversion.
 
