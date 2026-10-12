@@ -51,17 +51,6 @@ private func book(_ title: String, author: String = "A", seconds: Int = 60, rati
     #expect(books.sorted(using: BookComparator.defaultOrder).map(\.title) == ["Book 9", "Book 10", "alpha"])
 }
 
-@Test func updateVersionComparison() {
-    #expect(UpdateCheck.isNewer("v0.2.0", than: "0.1.0"))
-    #expect(UpdateCheck.isNewer("0.1.10", than: "0.1.9"))
-    #expect(UpdateCheck.isNewer("1.0", than: "0.9.9"))
-    #expect(!UpdateCheck.isNewer("0.1", than: "0.1.0"))
-    #expect(!UpdateCheck.isNewer("v0.1.0-beta", than: "0.1.0"))
-    #expect(!UpdateCheck.isNewer("0.0.9", than: "0.1.0"))
-    #expect(UpdateCheck.tag(fromRelease: Data(#"{"tag_name":"v1.2.3","name":"x"}"#.utf8)) == "v1.2.3")
-    #expect(UpdateCheck.tag(fromRelease: Data(#"{"message":"Not Found"}"#.utf8)) == nil)
-}
-
 private let exportBooks: [Book] = {
     var a = book("Dune, Part \"One\"", author: "Frank Herbert", seconds: 3_660, rating: 4.5, purchased: "2024-05-06")
     a.genre = "Sci-Fi:Classics"

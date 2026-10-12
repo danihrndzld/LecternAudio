@@ -1,3 +1,4 @@
+import Sparkle
 import SwiftUI
 
 @main
@@ -5,6 +6,8 @@ struct EarmarkApp: App {
     @State private var library = LibraryModel()
     @State private var player = Player()
     @State private var session = AudibleSession()
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    private var updater: SPUUpdater { updaterController.updater }
 
     var body: some Scene {
         WindowGroup {
@@ -27,7 +30,7 @@ struct EarmarkApp: App {
                 }
                 #endif
         }
-        .commands { AppCommands(library: library, player: player, session: session) }
+        .commands { AppCommands(library: library, player: player, session: session, updater: updater) }
 
         Window("Sign In to Audible", id: SignInView.windowID) {
             SignInView().environment(session)
@@ -37,7 +40,7 @@ struct EarmarkApp: App {
         .restorationBehavior(.disabled)
 
         Settings {
-            SettingsView().environment(session)
+            SettingsView(updater: updater).environment(session)
         }
     }
 }

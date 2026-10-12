@@ -6,11 +6,16 @@ options:
 packages:
   AudibleCore:
     path: Packages/AudibleCore
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.10.0"
 settings:
   base:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # Sparkle appcast. Change this one line to move releases to another repo or name.
+    EARMARK_FEED_URL: https://github.com/danihrndzld/Earmark/releases/latest/download/appcast.xml
 targets:
   Earmark:
     type: application
@@ -18,10 +23,20 @@ targets:
     sources: [App/Sources, App/Resources]
     dependencies:
       - package: AudibleCore
+      - package: Sparkle
     postBuildScripts:
       - name: Build and embed FFmpeg
         script: /bin/bash "$SRCROOT/scripts/build-ffmpeg.sh"
         basedOnDependencyAnalysis: false
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        SUFeedURL: $(EARMARK_FEED_URL)
+        SUPublicEDKey: 6AlIbh3SEK9GPYRrelmHV7OdKneR9qJMyjkGxzNKQoM=
+        SUEnableInstallerLauncherService: true
+        SUEnableAutomaticChecks: true
     entitlements:
       path: App/Earmark.entitlements
       properties:
@@ -29,6 +44,12 @@ targets:
         com.apple.security.network.client: true
         com.apple.security.files.user-selected.read-write: true
         com.apple.security.files.bookmarks.app-scope: true
+        # Ad-hoc signatures have no Team ID, so hardened runtime's library validation would refuse to load Sparkle.framework.
+        com.apple.security.cs.disable-library-validation: true
+        # Sparkle's installer launcher service: https://sparkle-project.org/documentation/sandboxing/
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.earmark

@@ -1,4 +1,5 @@
 import AudibleCore
+import Sparkle
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -11,7 +12,6 @@ enum Prefs {
     static let autoSync = "autoSync"
     static let autoSyncHours = "autoSyncHours"
     static let showProgress = "showProgress"
-    static let disableUpdateChecks = "disableUpdateChecks"
     static let language = "language"  // "" follows the system
     static let appearance = "appearance"  // "system", "light", "dark"
     static let tableFontSize = "tableFontSize"  // "small", "medium", "large"
@@ -63,9 +63,11 @@ enum Prefs {
 }
 
 struct SettingsView: View {
+    let updater: SPUUpdater
+
     var body: some View {
         TabView {
-            Tab("General", systemImage: "gearshape") { GeneralSettings() }
+            Tab("General", systemImage: "gearshape") { GeneralSettings(updater: updater) }
             Tab("Advanced", systemImage: "gearshape.2") { AdvancedSettings() }
             Tab("Account", systemImage: "person.crop.circle") { AccountSettings() }
         }
@@ -74,6 +76,7 @@ struct SettingsView: View {
 }
 
 private struct GeneralSettings: View {
+    let updater: SPUUpdater
     @AppStorage(Prefs.outputFormat) private var outputFormat = "m4b"
     @AppStorage(Prefs.mp3Bitrate) private var bitrate = 64
     @AppStorage(Prefs.mp3VBR) private var vbr = false
@@ -81,7 +84,8 @@ private struct GeneralSettings: View {
     @AppStorage(Prefs.autoSync) private var autoSync = true
     @AppStorage(Prefs.autoSyncHours) private var autoSyncHours = 24
     @AppStorage(Prefs.showProgress) private var showProgress = false
-    @AppStorage(Prefs.disableUpdateChecks) private var disableUpdateChecks = false
+    /// Sparkle's own defaults key, read only so the toggle redraws; writes go through the updater.
+    @AppStorage("SUEnableAutomaticChecks") private var automaticUpdateChecks = true
     @AppStorage(Prefs.language) private var language = ""
     @AppStorage(Prefs.appearance) private var appearance = "system"
     @AppStorage(Prefs.tableFontSize) private var tableFontSize = "medium"
@@ -113,9 +117,8 @@ private struct GeneralSettings: View {
                 Toggle(isOn: $autoSync) {
                     Stepper("Sync with Audible every \(autoSyncHours) hours", value: $autoSyncHours, in: 1...168)
                 }
-                Toggle("Disable update checks", isOn: $disableUpdateChecks)
-                Text("Earmark has no updater yet; this choice is kept for when it does.")
-                    .font(.callout).foregroundStyle(.secondary)
+                Toggle("Disable update checks", isOn: Binding(
+                    get: { !automaticUpdateChecks }, set: { updater.automaticallyChecksForUpdates = !$0 }))
             }
             Section("Language and Theme") {
                 Picker("Language", selection: $language) {

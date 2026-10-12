@@ -24,7 +24,24 @@ The main features are listed below.
 - Settings
   - Choose the output format, the MP3 bitrate, automatic sync, appearance, table font size, and external apps.
 
-The Help menu can check GitHub for new releases, open a bug report with your app and macOS versions filled in, and show a diagnostics window with library counts that you can copy.
+The Help menu can check for updates, open a bug report with your app and macOS versions filled in, and show a diagnostics window with library counts that you can copy.
+
+## Install
+
+Earmark isn't signed with an Apple Developer ID, so macOS asks you to confirm it once.
+
+1. Download the latest `Earmark` DMG file from the [Releases](https://github.com/danihrndzld/Earmark/releases) page.
+2. Open the DMG and drag Earmark to the Applications folder.
+3. Open Earmark. macOS 26 says it can't verify the app, so click Done.
+4. Open System Settings, go to Privacy & Security, scroll to the Security section, and click Open Anyway next to the Earmark message. Then confirm with your password.
+
+If you prefer the Terminal, this command removes the download flag instead, and Earmark then opens normally.
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Earmark.app
+```
+
+You only do this once. Earmark checks for new versions once a day with Sparkle, and you can also choose Help, then Check for Updates. When a new version is out, Sparkle shows it with an Install Update button, checks it against Earmark's signing key, and relaunches the app. macOS doesn't ask you to approve the updated app again. You can turn off the daily check in Settings.
 
 ## Requirements
 
@@ -87,6 +104,18 @@ AI coding agents write most of the code, and pull requests merge without a human
 
 You can stop an automatic merge by adding the `hold` label to a pull request. Issues with the `agent` label can be picked up by the Claude GitHub workflow, which needs the Claude GitHub App to be installed on the repository. The rules that agents follow are in `CLAUDE.md`.
 
+## Releasing
+
+To publish a version, push a tag that starts with `v`.
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for Sparkle with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. Run `scripts/release.sh 0.2.0 1` to build the same files on your Mac; it signs with the Sparkle key in your login Keychain. The feed address is the `EARMARK_FEED_URL` setting in `project.yml`.
+
+Sparkle reads the feed without signing in to GitHub, so updates only reach people when the repository is public.
+
 ## Licenses
 
 Earmark bundles third party code under the licenses listed below.
@@ -94,3 +123,4 @@ Earmark bundles third party code under the licenses listed below.
 - LAME 3.100 for MP3 encoding, under the LGPL.
 - FFmpeg 8.0 for conversion, under the LGPL 2.1. The app includes the license, the matching source archive, and the build script.
 - swift-crypto for SHA-256 and RSA, under the Apache License 2.0.
+- Sparkle 2.10.0 for updates, under the MIT License.
