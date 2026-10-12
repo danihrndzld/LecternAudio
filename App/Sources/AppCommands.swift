@@ -26,6 +26,10 @@ struct AppCommands: Commands {
             }
             .disabled(!library.books.contains { library.selection.contains($0.id) && library.canDownload($0) })
         }
+        CommandGroup(after: .textEditing) {
+            Button("Find") { library.focusSearchRequest += 1 }
+                .keyboardShortcut("f")
+        }
         PlayerCommands(library: library, player: player)
         ViewCommands(library: library)
         HelpCommands(library: library, session: session, updater: updater)
@@ -227,6 +231,8 @@ private struct ViewCommands: Commands {
             Button("Decrease Font Size") { step(-1) }
                 .keyboardShortcut("-")
                 .disabled(fontSize == .small)
+            Button(library.showInspector ? "Hide Inspector" : "Show Inspector") { library.showInspector.toggle() }
+                .keyboardShortcut("i")
             Button("Focus Book List") {
                 gridMode = false
                 library.focusListRequest += 1

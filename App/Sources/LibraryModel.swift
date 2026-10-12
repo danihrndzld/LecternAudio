@@ -36,6 +36,8 @@ final class LibraryModel {
     var showChapters = false
     /// Bumped by View ▸ Focus Book List; the table takes focus when it changes.
     var focusListRequest = 0
+    /// Bumped by Edit ▸ Find (⌘F); `ContentView` moves focus to the search field (issue #6).
+    var focusSearchRequest = 0
     /// Books added with File ▸ Import, kept across launches with security-scoped bookmarks.
     var imported: [Book] = [] { didSet { merge() } }
     @ObservationIgnored var importedURLs: [Book.ID: URL] = [:]
