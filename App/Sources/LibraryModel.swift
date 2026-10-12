@@ -122,6 +122,8 @@ final class LibraryModel {
         }
     }
 
+    var isSignedIn: Bool { accountIdentity != nil }
+
     func canDownload(_ book: Book) -> Bool {
         accountIdentity != nil && audibleBooks.contains { $0.asin == book.asin } && !book.hasAudio
     }
