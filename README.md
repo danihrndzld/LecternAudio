@@ -18,11 +18,12 @@ The main features are listed below.
   - Control playback from the Player menu, the keyboard, and the macOS Now Playing widget. The Player menu has shortcuts for skipping, chapters, and volume.
 - Files
   - Download books from your account and convert them to M4B.
-  - Export a book to MP3, as one file or as one file per chapter, with ID3 tags, chapters, and cover art.
+  - Export a book to MP3, as one file or as one file per chapter, with ID3 tags, chapters, and cover art. MP3 files use 320 kbps by default.
+  - Export a book to Ogg Vorbis at the highest quality, as one file or as one file per chapter. The file keeps the title, author, narrator, chapters, and cover art.
   - Import your own M4B and MP3 files, and join several audio files into one M4B.
   - Export the library list to Excel, CSV, or JSON, and export a poster of the covers as a PNG image.
 - Settings
-  - Choose the output format, the MP3 bitrate, automatic sync, appearance, table font size, and external apps.
+  - Choose the output format (M4B, MP3, or Ogg Vorbis), the MP3 bitrate, the Ogg Vorbis quality, automatic sync, appearance, table font size, and external apps.
 
 The Help menu can check for updates, open a bug report with your app and macOS versions filled in, and show a diagnostics window with library counts that you can copy.
 
@@ -79,7 +80,7 @@ More details about downloads and conversion are in [docs/aax-conversion.md](docs
 
 The code is split into a Swift package and an app target, so the core logic can be tested without a user interface.
 
-- `Packages/AudibleCore` holds the models, the OpenAudible import, the Audible sign in and library API, the MP3 encoder, and their tests. It builds on Linux as well as macOS, so it doesn't import AppKit or SwiftUI.
+- `Packages/AudibleCore` holds the models, the OpenAudible import, the Audible sign in and library API, the MP3 and Ogg Vorbis encoders, and their tests. It builds on Linux as well as macOS, so it doesn't import AppKit or SwiftUI.
 - `App/Sources` holds the SwiftUI app, including the windows, the player, the settings, and the download queue.
 - `docs` holds the feature inventory of OpenAudible, the design decision record, and the conversion notes.
 - `scripts/build-ffmpeg.sh` builds the bundled FFmpeg helper.
@@ -123,6 +124,7 @@ Sparkle reads the feed without signing in to GitHub, so updates only reach peopl
 Lectern Audio bundles third party code under the licenses listed below.
 
 - LAME 3.100 for MP3 encoding, under the LGPL.
+- libogg 1.3.6 and libvorbis 1.3.7 for Ogg Vorbis encoding, under the BSD 3 clause license.
 - FFmpeg 8.0 for conversion, under the LGPL 2.1. The app includes the license, the matching source archive, and the build script.
 - swift-crypto for SHA-256 and RSA, under the Apache License 2.0.
 - Sparkle 2.10.0 for updates, under the MIT License.

@@ -25,17 +25,19 @@ struct BookDetail: View {
 
                 if let progress = model.exports[book.id] {
                     HStack {
-                        ProgressView("Exporting MP3…", value: progress)
+                        ProgressView("Exporting…", value: progress)
                         Button("Cancel", systemImage: "xmark.circle.fill") { model.cancelExport(book.id) }
                             .labelStyle(.iconOnly).buttonStyle(.borderless)
                     }
                 } else if model.m4bURL(for: book) != nil {
                     Menu {
-                        Button("One File per Chapter…") { model.exportMP3(book, byChapter: true) }
+                        Button("Export MP3…") { model.exportAudio(book, ext: "mp3", byChapter: false) }
+                        Button("Export MP3 by Chapter…") { model.exportAudio(book, ext: "mp3", byChapter: true) }
+                        Divider()
+                        Button("Export Ogg Vorbis…") { model.exportAudio(book, ext: "ogg", byChapter: false) }
+                        Button("Export Ogg Vorbis by Chapter…") { model.exportAudio(book, ext: "ogg", byChapter: true) }
                     } label: {
-                        Label("Export MP3…", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
-                    } primaryAction: {
-                        model.exportMP3(book, byChapter: false)
+                        Label("Export…", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity)
                     }
                 }
 

@@ -62,6 +62,8 @@ struct AboutView: View {
             VStack(spacing: 4) {
                 Text("For personal use. Not affiliated with Audible or Amazon.").fontWeight(.medium)
                 Text("LAME 3.100 — GNU LGPL")
+                Text("libogg 1.3.6 — BSD")
+                Text("libvorbis 1.3.7 — BSD")
                 if AppInfo.ffmpegBundled { Text("FFmpeg — GNU LGPL v2.1") }
                 Text("swift-crypto — Apache License 2.0")
             }

@@ -4,7 +4,7 @@ import AVFoundation
 /// Converts a plain (decrypted) M4B/M4A to MP3: AVFoundation decodes, LAME encodes, `ID3Tag` tags.
 public enum MP3Export {
     public struct Options: Sendable {
-        public var bitrate = 64
+        public var bitrate = 320
         public var mode = MP3Encoder.Mode.cbr
         /// Write `destination/<nn> - <chapter>.mp3` instead of one file.
         public var splitChapters = false
@@ -30,7 +30,7 @@ public enum MP3Export {
         var tag = tag
         if tag.chapters.isEmpty { tag.chapters = try await chapters(of: asset) }
 
-        func encode(_ range: CMTimeRange?, _ tag: ID3Tag, to url: URL, progress: (Double) -> Void) throws {
+        func encode(_ range: CMTimeRange?, _ tag: ID3Tag, to url: URL, overall: (Double) -> Double) throws {
             let reader = try AVAssetReader(asset: asset)
             if let range { reader.timeRange = range }
             let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
@@ -43,12 +43,7 @@ public enum MP3Export {
             defer { reader.cancelReading() }
 
             let encoder = try MP3Encoder(sampleRate: sampleRate, channels: channels, bitrate: options.bitrate, mode: options.mode)
-            guard FileManager.default.createFile(atPath: url.path, contents: nil) else {
-                throw Failure(errorDescription: "Cannot create \(url.path)")
-            }
-            do {
-                let file = try FileHandle(forWritingTo: url)
-                defer { try? file.close() }
+            try write(url) { file in
                 let id3 = tag.data
                 try file.write(contentsOf: id3)
                 let start = range?.start.seconds ?? 0, length = range?.duration.seconds ?? duration
@@ -58,7 +53,7 @@ public enum MP3Export {
                     guard let pcm = try buffer.dataBuffer?.dataBytes() else { continue }
                     try file.write(contentsOf: pcm.withUnsafeBytes { try encoder.encode($0.bindMemory(to: Int16.self)) })
                     let done = (buffer.presentationTimeStamp.seconds - start) / max(length, 1)
-                    if done - reported >= 0.005 { reported = done; progress(min(max(done, 0), 1)) }
+                    if done - reported >= 0.005 { reported = done; progress(overall(min(max(done, 0), 1))) }
                 }
                 if reader.status != .completed { throw reader.error ?? Failure(errorDescription: "Decoding stopped early") }
                 try file.write(contentsOf: encoder.flush())
@@ -67,15 +62,21 @@ public enum MP3Export {
                     try file.seek(toOffset: UInt64(id3.count))
                     try file.write(contentsOf: lameTag)
                 }
-            } catch {
-                try? FileManager.default.removeItem(at: url)
-                throw error
             }
         }
 
-        guard options.splitChapters, !tag.chapters.isEmpty else {
-            let file = destination.pathExtension.isEmpty ? destination.appendingPathExtension("mp3") : destination
-            return try encode(nil, tag, to: file, progress: progress)
+        try perFile(tag: tag, destination: destination, ext: "mp3", duration: duration,
+                    splitChapters: options.splitChapters, encode: encode)
+    }
+
+    /// One file at `destination` (gets `.ext` when it has no extension), or with `splitChapters`
+    /// a folder at `destination` holding `<nn> - <chapter>.ext`, each tagged with its chapter title and track number.
+    /// `encode` gets a function that maps its own 0...1 progress to the whole export's.
+    static func perFile(tag: ID3Tag, destination: URL, ext: String, duration: Double, splitChapters: Bool,
+                        encode: (CMTimeRange?, ID3Tag, URL, (Double) -> Double) throws -> Void) throws {
+        guard splitChapters, !tag.chapters.isEmpty else {
+            let file = destination.pathExtension.isEmpty ? destination.appendingPathExtension(ext) : destination
+            return try encode(nil, tag, file) { $0 }
         }
         let created = !FileManager.default.fileExists(atPath: destination.path)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
@@ -86,17 +87,35 @@ public enum MP3Export {
                 t.title = c.title
                 t.track = "\(i + 1)/\(tag.chapters.count)"
                 t.chapters = []
-                let name = String(format: "%0\(digits)d - ", i + 1) + Book.fileName(c.title, fallback: "Chapter") + ".mp3"
+                let name = String(format: "%0\(digits)d - ", i + 1) + Book.fileName(c.title, fallback: "Chapter") + "." + ext
                 let range = CMTimeRange(start: CMTime(value: Int64(c.startMs), timescale: 1000),
                                         duration: CMTime(value: Int64(c.lengthMs), timescale: 1000))
-                try encode(range, t, to: destination.appendingPathComponent(name)) { p in
-                    progress((c.start + p * Double(c.lengthMs) / 1000) / max(duration, 1))
+                try encode(range, t, destination.appendingPathComponent(name)) { p in
+                    (c.start + p * Double(c.lengthMs) / 1000) / max(duration, 1)
                 }
             }
         } catch {
             if created { try? FileManager.default.removeItem(at: destination) }
             throw error
         }
+    }
+
+    /// Writes `url.part`, then replaces `url` with it; the partial file is removed on failure or cancellation.
+    static func write(_ url: URL, _ body: (FileHandle) throws -> Void) throws {
+        let part = url.appendingPathExtension("part")
+        guard FileManager.default.createFile(atPath: part.path, contents: nil) else {
+            throw Failure(errorDescription: "Cannot create \(part.path)")
+        }
+        do {
+            let file = try FileHandle(forWritingTo: part)
+            defer { try? file.close() }
+            try body(file)
+        } catch {
+            try? FileManager.default.removeItem(at: part)
+            throw error
+        }
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+        try FileManager.default.moveItem(at: part, to: url)
     }
 
     static func chapters(of asset: AVAsset) async throws -> [Chapter] {

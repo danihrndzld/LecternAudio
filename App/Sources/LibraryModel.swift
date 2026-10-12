@@ -81,7 +81,7 @@ final class LibraryModel {
     @ObservationIgnored private var scopedRoot: URL?
     /// Imported files whose security scope is open for this app session.
     @ObservationIgnored var scopedImports: Set<URL> = []
-    /// Progress (0...1) of running MP3 exports.
+    /// Progress (0...1) of running MP3 and Ogg Vorbis exports.
     private(set) var exports: [Book.ID: Double] = [:]
     @ObservationIgnored private var exportTasks: [Book.ID: Task<Void, Never>] = [:]
 
@@ -180,10 +180,10 @@ final class LibraryModel {
         try AudibleLibrary.save(saved, to: root.appendingPathComponent("books.json"))
         downloadedLibrary = try OpenAudibleLibrary(root: root)
         merge()
-        // Output format MP3: keep the M4B (the player needs it) and add an MP3 copy beside it.
-        let mp3 = output.deletingPathExtension().appendingPathExtension("mp3")
-        if UserDefaults.standard.string(forKey: Prefs.outputFormat) == "mp3", !FileManager.default.fileExists(atPath: mp3.path) {
-            export(local, source: output, to: mp3.appendingPathExtension("part"), byChapter: false)
+        // Output format MP3 or Ogg: keep the M4B (the player needs it) and add a copy beside it.
+        if let ext = UserDefaults.standard.string(forKey: Prefs.outputFormat), ["mp3", "ogg"].contains(ext) {
+            let copy = output.deletingPathExtension().appendingPathExtension(ext)
+            if !FileManager.default.fileExists(atPath: copy.path) { export(local, ext: ext, source: output, to: copy, byChapter: false) }
         }
     }
 
@@ -287,8 +287,8 @@ final class LibraryModel {
         return book.files.first { $0.type == .m4b }.flatMap { library?.url(for: $0) }
     }
 
-    /// Asks where to save, then converts the book's M4B to MP3 (bitrate and VBR from Settings) in the background.
-    func exportMP3(_ book: Book, byChapter: Bool) {
+    /// Asks where to save, then converts the book's M4B to MP3 or Ogg Vorbis (`ext` "mp3" or "ogg", options from Settings) in the background.
+    func exportAudio(_ book: Book, ext: String, byChapter: Bool) {
         guard let source = m4bURL(for: book), exportTasks[book.id] == nil else { return }
         let name = Book.fileName(book.title, fallback: book.asin.isEmpty ? "Book" : book.asin)
         let destination: URL
@@ -298,21 +298,21 @@ final class LibraryModel {
             panel.canChooseDirectories = true
             panel.canCreateDirectories = true
             panel.prompt = "Export"
-            panel.message = "A folder named “\(name)” with one MP3 per chapter is created here."
+            panel.message = "A folder named “\(name)” with one \(ext == "ogg" ? "Ogg Vorbis file" : "MP3") per chapter is created here."
             guard panel.runModal() == .OK, let dir = panel.url else { return }
             destination = dir.appendingPathComponent(name)
         } else {
             let panel = NSSavePanel()
-            panel.allowedContentTypes = [.mp3]
-            panel.nameFieldStringValue = name + ".mp3"
+            panel.allowedContentTypes = [UTType(filenameExtension: ext) ?? .audio]
+            panel.nameFieldStringValue = name + "." + ext
             guard panel.runModal() == .OK, let url = panel.url else { return }
             destination = url
         }
-        export(book, source: source, to: destination, byChapter: byChapter)
+        export(book, ext: ext, source: source, to: destination, byChapter: byChapter)
     }
 
-    /// A destination ending in `.part` is renamed without it once the export succeeds.
-    private func export(_ book: Book, source: URL, to destination: URL, byChapter: Bool) {
+    /// The exporters write `<file>.part` and rename it when done.
+    private func export(_ book: Book, ext: String, source: URL, to destination: URL, byChapter: Bool) {
         guard exportTasks[book.id] == nil else { return }
         var tag = ID3Tag()
         tag.title = book.title
@@ -323,18 +323,21 @@ final class LibraryModel {
         tag.year = book.releaseDate.map { String(Calendar.current.component(.year, from: $0)) } ?? ""
         tag.comment = HTMLText.markdown(book.summary)
         tag.cover = (library?.artURL(for: book) ?? book.imageURL).flatMap { $0.isFileURL ? try? Data(contentsOf: $0) : nil }
-        var options = Prefs.mp3Options
-        options.splitChapters = byChapter
+        var mp3 = Prefs.mp3Options, ogg = Prefs.oggOptions
+        mp3.splitChapters = byChapter
+        ogg.splitChapters = byChapter
 
         let id = book.id
         exports[id] = 0
         exportTasks[id] = Task {
             do {
-                try await MP3Export.run(source: source, destination: destination, tag: tag, options: options) { p in
+                let progress: @Sendable (Double) -> Void = { p in
                     Task { @MainActor in if self.exports[id] != nil { self.exports[id] = p } }
                 }
-                if destination.pathExtension == "part" {
-                    try FileManager.default.moveItem(at: destination, to: destination.deletingPathExtension())
+                if ext == "ogg" {
+                    try await OggExport.run(source: source, destination: destination, tag: tag, options: ogg, progress: progress)
+                } else {
+                    try await MP3Export.run(source: source, destination: destination, tag: tag, options: mp3, progress: progress)
                 }
                 Prefs.playCompletionSound()
             } catch is CancellationError {
