@@ -55,6 +55,10 @@ The app crashed at launch with "No Observable object of type LibraryModel found"
 
 When the player bar appeared, it raised the detail column's minimum width. `NSSplitView` applied the new minimum during the constraint pass, and AppKit threw "needs update constraints". The first fix attempt, which moved the bar from a safe area inset into a `VStack`, did not help. A bisection showed that the speed `Picker` gave the bar a large fixed width. The fix is `.frame(minWidth: 0, maxWidth: .infinity)` on any view that appears or disappears inside a split view column. `LECTERN_PLAY=1` reproduces it without clicks.
 
+### 0.3.0 crashed at launch in the cover grid (PR #64)
+
+0.3.0 aborted 3 seconds after launch for the owner, with the same "needs update constraints" exception from `SplitViewChildController.hostingView(_:didUpdateMinSize:maxSize:)`. It needed the cover grid, the OpenAudible folder and the synced Audible list together, and it never happened in the list view or with the demo library. At launch the detail column switches from `Onboarding` to `LibraryGrid` once the books load, and the two report different minimum widths. #59 only changed launch timing: removing either of two unrelated lines from it hid the crash, so a bisect pointed at it but it wasn't the cause. The fix is the same as for the player bar, `minWidth: 0` on the detail column's content and on the inspector's content. To reproduce, build with `CODE_SIGN_ENTITLEMENTS= ENABLE_HARDENED_RUNTIME=NO PRODUCT_BUNDLE_IDENTIFIER=<other id>`, set `viewMode` to true in that domain, and launch with `LECTERN_HARNESS=1 LECTERN_LIBRARY=<copy of books.json and art> LECTERN_SYNCED_LIBRARY=<copy of catalog.json>`. Launch it 5 times, because a timing crash can pass once.
+
 ### Summary HTML crashed a system helper (PR #9)
 
 `NSAttributedString` HTML import runs WebKit in `nsattributedstringagent`, which faulted under the sandbox. Use `HTMLText.markdown` for Audible summaries.

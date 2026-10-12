@@ -34,7 +34,9 @@ struct ContentView: View {
                         LibraryTable()
                     }
                 }
-                .frame(maxHeight: .infinity)
+                // minWidth 0: the onboarding, grid and table report different minimum widths, and a column
+                // whose minimum changes during AppKit's constraint pass crashes the window (docs/memory.md).
+                .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
                 if player.book != nil { PlayerBar() }
             }
             .modifier(LibraryTitle(model: model))
@@ -47,6 +49,7 @@ struct ContentView: View {
                     ContentUnavailableView("No Selection", systemImage: "book.closed", description: Text("Select a book to see its details."))
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity)
             .inspectorColumnWidth(min: 280, ideal: 340, max: 460)
         }
         .searchable(text: $model.search, prompt: "Title, author, narrator")
