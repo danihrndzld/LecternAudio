@@ -12,7 +12,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.2.0"
     CURRENT_PROJECT_VERSION: "1"
     # Sparkle appcast. Change this one line to move releases to another repo or name.
     LECTERN_FEED_URL: https://github.com/danihrndzld/LecternAudio/releases/latest/download/appcast.xml

@@ -8,6 +8,8 @@ Lectern Audio is for personal use with books you bought, and it isn't affiliated
 
 You can browse your library in a sortable table or in a grid of covers, and you can filter it from the sidebar by status, file type, or genre. The inspector on the right shows the cover, the details, the summary, and the chapter list of the selected book.
 
+The library stays fast with 500 to 1,000 books. Switching a sidebar filter, sorting, or searching takes 35 to 110 ms of work on the main thread in version 0.2.0, and the slowest switch in earlier builds froze the window for 9 seconds. The list is a native AppKit table that updates its visible rows in place, and the covers are small thumbnails that the app decodes in the background and keeps in memory. The [0.2.0 release notes](https://github.com/danihrndzld/LecternAudio/releases/tag/v0.2.0) describe the cause and the measurements.
+
 The main features are listed below.
 
 - Library
@@ -50,7 +52,7 @@ If you used the app when it was called Earmark, macOS treats Lectern Audio as a 
 
 You need macOS 26 or later to run Lectern Audio. To build it, you need Xcode 26 or later and XcodeGen, which you can install with Homebrew.
 
-The first build downloads the FFmpeg 8.0 source code, checks its checksum, and builds a small FFmpeg helper that the app uses for conversion. Later builds reuse the cached helper, so you don't need to install FFmpeg yourself. It does the same for aria2 1.37.0, an optional faster downloader (Settings › Advanced › Downloads).
+The first build downloads the FFmpeg 8.0 source code, checks its checksum, and builds a small FFmpeg helper that the app uses for conversion. Later builds reuse the cached helper, so you don't need to install FFmpeg yourself. It does the same for aria2 1.37.0, an optional faster downloader that you can turn on in Settings, under Advanced and then Downloads.
 
 ## Build and run
 
@@ -116,7 +118,7 @@ To publish a version, push a tag that starts with `v`.
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for Sparkle with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. Run `scripts/release.sh 0.2.0 1` to build the same files on your Mac; it signs with the Sparkle key in your login Keychain. The feed address is the `LECTERN_FEED_URL` setting in `project.yml`.
+The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for Sparkle with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. Run `scripts/release.sh 0.2.0 1` to build the same files on your Mac, and the script signs them with the Sparkle key in your login Keychain. The feed address is the `LECTERN_FEED_URL` setting in `project.yml`.
 
 Sparkle reads the feed without signing in to GitHub, so updates only reach people when the repository is public.
 
@@ -127,6 +129,6 @@ Lectern Audio bundles third party code under the licenses listed below.
 - LAME 3.100 for MP3 encoding, under the LGPL.
 - libogg 1.3.6 and libvorbis 1.3.7 for Ogg Vorbis encoding, under the BSD 3 clause license.
 - FFmpeg 8.0 for conversion, under the LGPL 2.1. The app includes the license, the matching source archive, and the build script.
-- aria2 1.37.0 for optional parallel downloads, under the GPL 2 or later with the OpenSSL exception. It ships as a separate helper program; the app includes the license, the matching source archive, and the build script.
+- aria2 1.37.0 for optional parallel downloads, under the GPL 2 or later with the OpenSSL exception. It ships as a separate helper program, and the app includes the license, the matching source archive, and the build script.
 - swift-crypto for SHA-256 and RSA, under the Apache License 2.0.
 - Sparkle 2.10.0 for updates, under the MIT License.
