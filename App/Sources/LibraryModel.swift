@@ -118,7 +118,7 @@ final class LibraryModel {
                 audibleBooks = fetched
                 lastSync = .now
                 AppLog.shared.info("Synced \(fetched.count) books from Audible")
-                if downloads.automaticallyDownload { downloads.enqueue(books) }
+                if downloads.automaticallyDownload { downloads.enqueue(books, userInitiated: false) }
             } catch let error where error is CancellationError || Task.isCancelled {
             } catch {
                 if syncGeneration == generation { syncError = error.localizedDescription; AppLog.shared.error("Sync failed: \(error.localizedDescription)") }

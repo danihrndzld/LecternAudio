@@ -26,6 +26,10 @@ struct DownloadsView: View {
                     if [.failed, .cancelled].contains(job.state) {
                         Button("Retry") { downloads.enqueue([job.book]) }
                     } else if [.queued, .licensing, .downloading, .converting].contains(job.state) {
+                        // A held queue tells its queued jobs to retry once back online, so offer Retry there too.
+                        if job.state == .queued && downloads.waitingForConnection {
+                            Button("Retry") { downloads.enqueue([job.book]) }
+                        }
                         Button("Cancel") { downloads.cancel(job.id) }
                     }
                 }

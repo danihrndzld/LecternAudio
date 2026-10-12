@@ -20,8 +20,12 @@ final class DownloadModel {
     private weak var library: LibraryModel?
     private var generation = UUID()
     private var queueIsReadable = true
+    /// Set when the network turned out to be unreachable: the queue holds where it is (issue #31).
+    /// Cleared by any enqueue (an explicit action, or the automatic one after a successful sync) and
+    /// by a completed job, since both prove the network works again.
+    private(set) var waitingForConnection = false
 
-    var pendingCount: Int { jobs.filter { [.queued, .licensing, .downloading, .converting].contains($0.state) }.count }
+    var pendingCount: Int { jobs.filter { $0.state == .queued || DownloadQueue.isRunning($0.state) }.count }
 
     func configure(session: AudibleSession, library: LibraryModel, root: URL?) {
         let next = session.account?.storageID
@@ -38,6 +42,7 @@ final class DownloadModel {
         jobs = []
         error = nil
         queueIsReadable = true
+        waitingForConnection = false
         if let root, FileManager.default.fileExists(atPath: root.appendingPathComponent("queue.json").path) {
             do {
                 jobs = try DownloadJob.restore(from: Data(contentsOf: root.appendingPathComponent("queue.json")))
@@ -51,14 +56,20 @@ final class DownloadModel {
         runNext()
     }
 
-    func enqueue(_ books: [Book]) {
+    /// `userInitiated` is false only for the automatic download after a sync, which must not revive a
+    /// book the owner cancelled or one that failed; only an explicit action resets those (issue #31).
+    func enqueue(_ books: [Book], userInitiated: Bool = true) {
         guard identity != nil, queueIsReadable else { return }
         for book in books where !book.hasAudio && AudibleContent.validASIN(book.asin) && library?.canDownload(book) == true {
             if let index = jobs.firstIndex(where: { $0.id == book.id }) {
-                if [.failed, .cancelled, .complete].contains(jobs[index].state) { jobs[index] = DownloadJob(book: book) }
+                if DownloadQueue.shouldReplace(existing: jobs[index].state, userInitiated: userInitiated) {
+                    jobs[index] = DownloadJob(book: book)
+                }
             } else { jobs.append(DownloadJob(book: book)) }
         }
         guard persist() else { return }
+        // An explicit action, or the automatic enqueue after a successful sync, ends a connection hold.
+        waitingForConnection = false
         runNext()
     }
 
@@ -90,8 +101,21 @@ final class DownloadModel {
         }
     }
 
+    /// Deletes the encrypted sources for `asin`. They are re-downloadable, useless without a fresh
+    /// license, and each is about the size of the finished book, so keeping them cost roughly twice the
+    /// disk of the library (issue #31). Only called once the converted M4B has been recorded, so a
+    /// failed or cancelled job keeps its partial download for Retry.
+    private func removeSources(for asin: String, in root: URL) {
+        let manager = FileManager.default
+        let folder = root.appendingPathComponent("sources")
+        guard let names = try? manager.contentsOfDirectory(atPath: folder.path) else { return }
+        for name in DownloadQueue.sources(for: asin, in: names) {
+            try? manager.removeItem(at: folder.appendingPathComponent(name))
+        }
+    }
+
     private func runNext() {
-        guard task == nil, let root, let session, let library,
+        guard task == nil, !waitingForConnection, let root, let session, let library,
               let job = jobs.first(where: { $0.state == .queued }) else { return }
         let token = generation
         let converter = AAXConverter()
@@ -118,6 +142,8 @@ final class DownloadModel {
                     guard generation == token else { throw CancellationError() }
                     try library.recordDownload(job.book, output: output, root: root)
                     update(job.id, .complete)
+                    waitingForConnection = false
+                    removeSources(for: job.book.asin, in: root)
                     return
                 }
                 let (data, response) = try await AudibleHTTP.data(for: AudibleContent.licenseRequest(asin: job.book.asin, account: account))
@@ -192,11 +218,20 @@ final class DownloadModel {
                     throw error
                 }
                 update(job.id, .complete)
+                waitingForConnection = false
+                removeSources(for: job.book.asin, in: root)
                 Prefs.playCompletionSound()
             } catch {
-                guard generation == token else { return }
-                if Task.isCancelled || error is CancellationError { update(job.id, .cancelled, message: "Cancelled. Retry to resume.") }
-                else {
+                // `cancel` has already recorded `.cancelled` and Retry has already queued a fresh job;
+                // whichever landed while this task unwound keeps its state (issue #31).
+                guard generation == token, let current = jobs.first(where: { $0.id == job.id })?.state,
+                      DownloadQueue.isRunning(current) else { return }
+                if Task.isCancelled || error is CancellationError {
+                    update(job.id, .cancelled, message: "Cancelled. Retry to resume.")
+                } else if DownloadQueue.isOffline(error) {
+                    waitingForConnection = true
+                    update(job.id, .queued, message: "Waiting for a connection. Retry once you are back online.")
+                } else {
                     let message = (error as? AudibleError)?.message ?? (error as? ConversionError)?.errorDescription
                         ?? "Download failed. Check your connection and disk space, then retry."
                     update(job.id, .failed, message: message)

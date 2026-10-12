@@ -17,7 +17,9 @@ enum AudibleHTTP {
         do { return try await session.data(for: request) }
         catch {
             try Task.checkCancellation()
-            throw AudibleErrorMessage.connection
+            // AudibleCore's ConnectionFailure, so the download queue can hold its position instead of
+            // failing every job in turn when the network is unreachable (issue #31).
+            throw ConnectionFailure()
         }
     }
 }
@@ -34,11 +36,6 @@ final class DownloadRedirects: NSObject, URLSessionTaskDelegate {
         }
         completionHandler(redirected)
     }
-}
-
-private enum AudibleErrorMessage: LocalizedError {
-    case connection
-    var errorDescription: String? { "Could not reach Audible. Check your connection and retry." }
 }
 
 private final class NoRedirects: NSObject, URLSessionTaskDelegate {

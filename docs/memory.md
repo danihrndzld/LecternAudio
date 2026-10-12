@@ -80,6 +80,28 @@ An unsandboxed Debug build made with `CODE_SIGN_ENTITLEMENTS=` also dropped `dis
 - Running `swift test` rewrites `Package.resolved` with a Sparkle pin. Don't commit that change by accident.
 - The CI runner uses Xcode 26, which failed to compile a large `ContentView` body that Xcode 27 compiled (PR #26). The log was cut off, so the cause is probably type checking time. Splitting the body into helper functions fixed it, so keep view bodies small.
 
+## Download queue
+
+### A wrapped error hid the offline case (issue #31)
+
+The queue failed every restored job on an offline launch, and the fix looked like "treat `URLError`
+connection codes as retry later". That check would never have fired: `AudibleHTTP.data(for:)` catches
+every transport error and rethrows a private app enum, so the licensing path -- the one that runs
+first for each job, through `currentAccount()` -- never surfaces a `URLError` at all. The connection
+error is now `ConnectionFailure` in AudibleCore, which both the app and `DownloadQueue.isOffline`
+know, and the raw `URLError` codes are still recognised for the download transport, which does throw
+them directly.
+
+Lessons:
+- Before matching on an error type, follow the throw site. An app-level wrapper two calls away can
+  make a plausible-looking check dead code that still compiles and still passes a happy-path test.
+- `DownloadModel` lives in the app target, which has no test target, so its state rules now live in
+  `DownloadQueue` in AudibleCore and are tested there. Put the decision in core and leave the app
+  with the plumbing.
+- The late-outcome bug (a Retry reverted to `.cancelled`) was invisible to the `generation` guard,
+  because `generation` only changes in `configure`. Guard on the job's current state instead: a task
+  that is unwinding has no claim on a job somebody else has already moved on.
+
 ## Scope decisions by the owner
 
 - The sign-in window stays a plain Amazon web page. Native email, password and code fields above it, added for Passwords AutoFill, were rejected.
