@@ -1,62 +1,129 @@
-# Lectern Audio
+<div align="center">
 
-Lectern Audio is a native macOS app for managing the audiobooks in your own Audible library, and it replaces OpenAudible, which is a Java app. Lectern Audio is written in Swift and SwiftUI, so it uses the standard macOS sidebar, table, inspector, menus, and Now Playing controls.
+<img src="docs/images/icon.png" alt="Lectern Audio icon" width="128" height="128">
 
-Lectern Audio is for personal use with books you bought, and it isn't affiliated with Audible or Amazon. The app was called Earmark before it was renamed to Lectern Audio.
+<h1>Lectern Audio</h1>
 
-## What the app does
+**A native Mac app for the audiobooks you own on Audible.<br>Sync your library, download and convert your books, and listen with chapters.**
 
-You can browse your library in a sortable table or in a grid of covers, and you can filter it from the sidebar by status, file type, or genre. The inspector on the right shows the cover, the details, the summary, and the chapter list of the selected book.
+[![Latest release](https://img.shields.io/github/v/release/danihrndzld/LecternAudio?style=flat-square&color=bf4520&label=release)](https://github.com/danihrndzld/LecternAudio/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/danihrndzld/LecternAudio/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/danihrndzld/LecternAudio/actions/workflows/ci.yml)
+[![macOS 26 or later](https://img.shields.io/badge/macOS-26%2B-555555?style=flat-square&logo=apple)](#install)
+[![Swift 6](https://img.shields.io/badge/Swift-6-555555?style=flat-square&logo=swift)](#build-it-yourself)
 
-The library stays fast with 500 to 1,000 books. Switching a sidebar filter, sorting, or searching takes 35 to 110 ms of work on the main thread in version 0.2.0, and the slowest switch in earlier builds froze the window for 9 seconds. The list is a native AppKit table that updates its visible rows in place, and the covers are small thumbnails that the app decodes in the background and keeps in memory. The [0.2.0 release notes](https://github.com/danihrndzld/LecternAudio/releases/tag/v0.2.0) describe the cause and the measurements.
+**[Download the latest version](https://github.com/danihrndzld/LecternAudio/releases/latest)**
 
-The main features are listed below.
+[What it does](#what-it-does) | [Install](#install) | [First steps](#first-steps) | [Speed](#speed) | [Questions](#questions) | [Build it yourself](#build-it-yourself)
 
-- Library
-  - Open an existing OpenAudible folder and read its `books.json`.
-  - Sign in to Audible and sync the list of books in your account, including books you haven't downloaded yet.
-- Listening
-  - Play M4B and MP3 files with chapters, playback speed, and saved positions.
-  - Control playback from the Player menu, the keyboard, and the macOS Now Playing widget. The Player menu has shortcuts for skipping, chapters, and volume.
-- Files
-  - Download books from your account and convert them to M4B.
-  - Export a book to MP3, as one file or as one file per chapter, with ID3 tags, chapters, and cover art. MP3 files use 320 kbps by default.
-  - Export a book to Ogg Vorbis at the highest quality, as one file or as one file per chapter. The file keeps the title, author, narrator, chapters, and cover art.
-  - Import your own M4B and MP3 files, and join several audio files into one M4B.
-  - Export the library list to Excel, CSV, or JSON, and export a poster of the covers as a PNG image.
-- Settings
-  - Choose the output format (M4B, MP3, or Ogg Vorbis), the MP3 bitrate, the Ogg Vorbis quality, automatic sync, appearance, table font size, and external apps.
+<br>
 
-The Help menu can check for updates, open a bug report with your app and macOS versions filled in, and show a diagnostics window with library counts that you can copy.
+<img src="docs/images/library-list.png" alt="The Lectern Audio window, with a sidebar of filters, a table of audiobooks, and the details of Project Hail Mary on the right" width="900">
+
+</div>
+
+<br>
+
+Lectern Audio replaces OpenAudible, which is a Java app, with an app written in Swift and SwiftUI. It uses the standard macOS sidebar, table, menus, and Now Playing controls, and it reads your existing OpenAudible folder, so you can switch without starting over.
+
+Lectern Audio is for personal use with books you bought. It isn't affiliated with Audible or Amazon.
+
+---
+
+## What it does
+
+- **See your whole library.** Browse your books in a table or in a grid of covers, filter them by status, file type, or genre, and search by title, author, or narrator.
+- **Sync with Audible.** Sign in on Amazon's own page, and Lectern Audio lists every book in your account, including the ones you haven't downloaded.
+- **Download and convert.** Select one book or many, right click, and choose Download and Convert. Lectern Audio downloads them one after the other and saves each one as an M4B file with chapters and cover art.
+- **Listen.** Play M4B and MP3 files with chapters, playback speed, and a saved position for each book. The keyboard, the Player menu, and the macOS Now Playing widget all control playback.
+- **Export.** Save a book as MP3 (320 kbps by default) or Ogg Vorbis, as one file or as one file per chapter, with tags, chapters, and cover art. You can also export the library list to Excel, CSV, or JSON.
+- **Bring your own files.** Import M4B and MP3 files you already have, and join several audio files into one M4B.
+
+<div align="center">
+<img src="docs/images/library-grid.png" alt="The cover grid view of Lectern Audio" width="900">
+</div>
 
 ## Install
 
-Lectern Audio isn't signed with an Apple Developer ID, so macOS asks you to confirm it once.
+Lectern Audio needs macOS 26 or later. The app isn't signed with an Apple Developer ID, so macOS asks you to confirm it the first time you open it.
 
-1. Download the latest `LecternAudio` DMG file from the [Releases](https://github.com/danihrndzld/LecternAudio/releases) page.
-2. Open the DMG and drag Lectern Audio to the Applications folder.
-3. Open Lectern Audio. macOS 26 says it can't verify the app, so click Done.
-4. Open System Settings, go to Privacy & Security, scroll to the Security section, and click Open Anyway next to the Lectern Audio message. Then confirm with your password.
+1. Download the `LecternAudio` DMG file from the [latest release](https://github.com/danihrndzld/LecternAudio/releases/latest).
+2. Open the DMG, and drag Lectern Audio to your Applications folder.
+3. Open Lectern Audio. When macOS says it can't verify the app, click Done.
+4. Open System Settings, go to Privacy & Security, and click Open Anyway next to the Lectern Audio message. Then confirm with your password.
 
-If you prefer the Terminal, this command removes the download flag instead, and Lectern Audio then opens normally.
+<details>
+<summary>Prefer the Terminal?</summary>
+
+This command removes the download flag, and Lectern Audio then opens normally.
 
 ```sh
 xattr -dr com.apple.quarantine "/Applications/Lectern Audio.app"
 ```
 
-You only do this once. Lectern Audio checks for new versions once a day with Sparkle, and you can also choose Help, then Check for Updates. When a new version is out, Sparkle shows it with an Install Update button, checks it against Lectern Audio's signing key, and relaunches the app. macOS doesn't ask you to approve the updated app again. You can turn off the daily check in Settings.
+</details>
 
-If you used the app when it was called Earmark, macOS treats Lectern Audio as a new app, so you set it up again once. Choose your OpenAudible folder again, sign in to Audible again, and set your preferences in Settings again. Books that Earmark already converted stay in your OpenAudible folder, and Lectern Audio finds them.
+You only do this once. Lectern Audio checks for new versions once a day, and you can also choose Help, then Check for Updates. Updates are checked against Lectern Audio's signing key, and macOS doesn't ask you to approve the updated app again.
 
-## Requirements
+## First steps
 
-You need macOS 26 or later to run Lectern Audio. To build it, you need Xcode 26 or later and XcodeGen, which you can install with Homebrew.
+You can start from an OpenAudible folder, from your Audible account, or from both.
 
-The first build downloads the FFmpeg 8.0 source code, checks its checksum, and builds a small FFmpeg helper that the app uses for conversion. Later builds reuse the cached helper, so you don't need to install FFmpeg yourself. It does the same for aria2 1.37.0, an optional faster downloader that you can turn on in Settings, under Advanced and then Downloads.
+1. **Open your OpenAudible library.** Choose File, then Open OpenAudible Library, and select the folder that contains `books.json`. Lectern Audio reads the folder and doesn't change OpenAudible's files.
+2. **Sign in to Audible.** Open Settings, go to Account, and choose Sign In to Audible. Amazon's sign in page opens inside Lectern Audio and handles the captcha and the two step code itself.
+3. **Sync.** Click the sync button in the toolbar. Books that are only in your account appear under In Audible Only in the sidebar, ready to download.
 
-## Build and run
+Your account tokens stay in the macOS Keychain. When you sign out, Lectern Audio removes the device from your Amazon account and deletes the saved tokens.
 
-Run the following commands from the repository folder.
+## Speed
+
+Lectern Audio stays fast with 500 to 1,000 books. Switching a sidebar filter, sorting, or searching takes 35 to 110 ms in version 0.2, and the slowest switch in earlier builds froze the window for 9 seconds.
+
+| Switch, 518 books | Before | Now |
+|---|---|---|
+| Finished to All Books | 9,118 ms | 46 ms |
+| A genre to All Books | 8,219 ms | 73 ms |
+| In Audible Only to All Books | 3,192 ms | 75 ms |
+
+The list is a native AppKit table that updates its visible rows in place, and covers are small thumbnails decoded in the background. The [0.2.0 release notes](https://github.com/danihrndzld/LecternAudio/releases/tag/v0.2.0) explain the cause and how we measured it.
+
+## Questions
+
+<details>
+<summary>Why don't I see a Download button?</summary>
+
+Downloads need an Audible sign in, because Lectern Audio asks your account for each book. Open Settings, go to Account, sign in, and sync. Books without a file then show Download and Convert. While you're signed out, they show a Sign In to Audible to Download button instead.
+
+</details>
+
+<details>
+<summary>Why does Convert to M4B ask for activation bytes?</summary>
+
+When you're signed in, Lectern Audio gets the key for your AAX files from your account, and it doesn't ask for anything. It asks for activation bytes only when you aren't signed in, or when the book isn't in your synced account.
+
+</details>
+
+<details>
+<summary>I used the app when it was called Earmark. What do I need to do?</summary>
+
+macOS treats Lectern Audio as a new app, so choose your OpenAudible folder again, sign in to Audible again, and set your preferences again. Books that Earmark converted stay in your OpenAudible folder, and Lectern Audio finds them.
+
+</details>
+
+<details>
+<summary>Where are my downloaded books saved?</summary>
+
+Books you download from your account are saved in Lectern Audio's own folder in Application Support. Books you convert from an OpenAudible folder are saved in that folder, under `books/Earmark/`. Use Show in Finder in the right click menu to open the folder of any book.
+
+</details>
+
+---
+
+## Build it yourself
+
+<details>
+<summary>Requirements, build, and tests</summary>
+
+You need macOS 26 or later, Xcode 26 or later, and XcodeGen, which you can install with Homebrew. Run these commands from the repository folder.
 
 ```sh
 brew install xcodegen
@@ -64,71 +131,58 @@ xcodegen generate
 open LecternAudio.xcodeproj
 ```
 
-Then build and run the `LecternAudio` scheme in Xcode. The project file is generated from `project.yml`, and Git ignores it, so run `xcodegen generate` again after you pull changes.
+Then build and run the `LecternAudio` scheme. The project file is generated from `project.yml`, and Git ignores it, so run `xcodegen generate` again after you pull changes.
 
-## First use
+The first build downloads the FFmpeg 8.0 and aria2 1.37.0 source code, checks their checksums, and builds two small helper programs that the app uses to convert and download. Later builds reuse them, so you don't need to install either one yourself.
 
-When you open Lectern Audio for the first time, you can start from an OpenAudible folder, from your Audible account, or from both.
-
-1. To use an OpenAudible library, choose File, then Open OpenAudible Library, and select the folder that contains `books.json`. Lectern Audio reads the folder and doesn't change OpenAudible's files.
-2. To use your Audible account, open Settings, go to the Account tab, and choose Sign In to Audible. Amazon's sign in page opens inside Lectern Audio, and it handles the captcha and two factor codes itself.
-3. After you sign in, click the sync button in the toolbar to fetch your library. Books that exist only in your account appear under "In Audible Only" in the sidebar.
-
-Lectern Audio keeps your account tokens in the macOS Keychain. When you sign out, Lectern Audio removes the device from your Amazon account and deletes the saved tokens and the synced library file.
-
-More details about downloads and conversion are in [docs/aax-conversion.md](docs/aax-conversion.md).
-
-## Project layout
-
-The code is split into a Swift package and an app target, so the core logic can be tested without a user interface.
-
-- `Packages/AudibleCore` holds the models, the OpenAudible import, the Audible sign in and library API, the MP3 and Ogg Vorbis encoders, and their tests. It builds on Linux as well as macOS, so it doesn't import AppKit or SwiftUI.
-- `App/Sources` holds the SwiftUI app, including the windows, the player, the settings, and the download queue.
-- `docs` holds the feature inventory of OpenAudible, the design decision record, and the conversion notes.
-- `scripts/build-ffmpeg.sh` builds the bundled FFmpeg helper.
-- `scripts/build-aria2.sh` builds the bundled aria2c helper (HTTPS through macOS, no other libraries).
-
-## Tests
-
-Run the package tests and a full app build with the commands below. CI runs the same steps on every pull request, on Linux for the package and on macOS for the app.
+To run the tests and a full build, use the commands below. CI runs the same steps on every pull request, on Linux for the package and on macOS for the app.
 
 ```sh
 swift test --package-path Packages/AudibleCore
-xcodegen generate
 xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build
 ```
 
 The tests run offline, because CI can't sign in to Audible. Network code is tested against recorded responses with personal data removed.
 
-## How development works
+</details>
 
-AI coding agents write most of the code, and pull requests merge without a human code review. The tests and the CI checks act as the review, so every change has to pass them before it lands.
+<details>
+<summary>Project layout</summary>
+
+- `Packages/AudibleCore` holds the models, the OpenAudible import, the Audible sign in and library code, the MP3 and Ogg Vorbis encoders, and their tests. It builds on Linux as well as macOS, so it doesn't import AppKit or SwiftUI.
+- `App/Sources` holds the app, including the windows, the player, the settings, and the download queue.
+- `docs` holds the OpenAudible feature list, the design decision record, the conversion notes, and the lessons learned.
+- `scripts` holds the FFmpeg and aria2 build scripts and the release script.
+
+</details>
+
+<details>
+<summary>How development works</summary>
+
+AI coding agents write most of the code, and pull requests merge without a human code review, so the tests and the CI checks are the review.
 
 1. First, an agent works on a branch and opens a pull request with a Conventional Commit title, e.g., `feat: app icon`.
-2. Second, the CI workflow builds the app and runs the tests.
+2. Second, CI builds the app and runs the tests.
 3. Third, when CI passes, the automerge workflow squash merges the pull request into `main`.
 
-You can stop an automatic merge by adding the `hold` label to a pull request. Issues with the `agent` label can be picked up by the Claude GitHub workflow, which needs the Claude GitHub App to be installed on the repository. The rules that agents follow are in `CLAUDE.md`.
+Add the `hold` label to a pull request to stop the automatic merge. The rules that agents follow are in `CLAUDE.md`, and the lessons from past bugs are in `docs/memory.md`.
 
-## Releasing
+</details>
 
-To publish a version, push a tag that starts with `v`.
+<details>
+<summary>Releasing</summary>
 
-```sh
-git tag v0.2.0 && git push origin v0.2.0
-```
+Push a tag that starts with `v`, e.g., `git tag v0.3.0 && git push origin v0.3.0`. The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for updates with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP, and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. `scripts/release.sh 0.3.0 1` builds the same files on your Mac with the key in your login Keychain.
 
-The release workflow builds a universal app, packs it as a DMG and a ZIP, signs the ZIP for Sparkle with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. Run `scripts/release.sh 0.2.0 1` to build the same files on your Mac, and the script signs them with the Sparkle key in your login Keychain. The feed address is the `LECTERN_FEED_URL` setting in `project.yml`.
-
-Sparkle reads the feed without signing in to GitHub, so updates only reach people when the repository is public.
+</details>
 
 ## Licenses
 
-Lectern Audio bundles third party code under the licenses listed below.
+Lectern Audio bundles third party code under these licenses.
 
 - LAME 3.100 for MP3 encoding, under the LGPL.
 - libogg 1.3.6 and libvorbis 1.3.7 for Ogg Vorbis encoding, under the BSD 3 clause license.
 - FFmpeg 8.0 for conversion, under the LGPL 2.1. The app includes the license, the matching source archive, and the build script.
-- aria2 1.37.0 for optional parallel downloads, under the GPL 2 or later with the OpenSSL exception. It ships as a separate helper program, and the app includes the license, the matching source archive, and the build script.
+- aria2 1.37.0 for optional faster downloads, under the GPL 2 or later with the OpenSSL exception. It ships as a separate helper program, and the app includes the license, the matching source archive, and the build script.
 - swift-crypto for SHA-256 and RSA, under the Apache License 2.0.
 - Sparkle 2.10.0 for updates, under the MIT License.
