@@ -51,7 +51,12 @@ import Testing
 
 @Test func lameEncodesSine() throws {
     let rate = 44_100
-    let pcm = (0..<rate).map { Int16(sin(Double($0) * 2 * .pi * 440 / Double(rate)) * 12_000) }
+    // Split and explicitly typed: as one expression the type checker times out (Swift 6.2), and the
+    // unresolved `pcm` then made `mp3 += try enc.flush()` resolve to AttributedString's `+=`.
+    let pcm: [Int16] = (0..<rate).map { i in
+        let angle = Double(i) * 2 * .pi * 440 / Double(rate)
+        return Int16(sin(angle) * 12_000)
+    }
     let enc = try MP3Encoder(sampleRate: rate, channels: 1)
     var mp3 = try pcm.withUnsafeBufferPointer { try enc.encode($0) }
     mp3 += try enc.flush()
