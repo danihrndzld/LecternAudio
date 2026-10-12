@@ -22,6 +22,16 @@
         }
       }
     },
+    "AAX Files": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivos AAX"
+          }
+        }
+      }
+    },
     "Account": {
       "localizations": {
         "es": {
@@ -58,6 +68,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aplicaciones"
+          }
+        }
+      }
+    },
+    "Audio": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
           }
         }
       }
@@ -118,6 +138,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Conexiones por servidor: %lld"
+          }
+        }
+      }
+    },
+    "Conversion": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversión"
           }
         }
       }
@@ -232,6 +262,16 @@
         }
       }
     },
+    "Library": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Biblioteca"
+          }
+        }
+      }
+    },
     "Library font size": {
       "localizations": {
         "es": {
@@ -282,6 +322,16 @@
         }
       }
     },
+    "Notifications": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notificaciones"
+          }
+        }
+      }
+    },
     "Play a sound when a download, conversion or export finishes": {
       "localizations": {
         "es": {
@@ -298,6 +348,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reproducir libros en un reproductor externo en lugar de Lectern Audio"
+          }
+        }
+      }
+    },
+    "Queue": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cola"
           }
         }
       }
@@ -388,6 +448,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Predeterminado del sistema"
+          }
+        }
+      }
+    },
+    "Updates": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualizaciones"
           }
         }
       }
