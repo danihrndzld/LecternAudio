@@ -52,18 +52,18 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
 
 ## Performance rules
 
-The library is 500 to 1,000+ books. A sidebar switch must stay under about 100 ms of main-thread work; it used to freeze for 150 ms (see `docs/memory.md`).
+The library is 500 to 1,000+ books. A sidebar switch must stay under about 100 ms of main-thread work; it used to freeze for 3 to 9 s (see `docs/memory.md`).
 - Never compute collections in `body`. Filtering, sorting, counts and grouping live in `LibraryIndex` (AudibleCore) and are recomputed only when books, filter, search or sort change. Read the cached result.
 - Keep observation narrow. A view should read only the properties it renders; read fast-changing values (player time) only inside small leaf views like `PlayerBar`, never in `ContentView`.
 - No disk or network work in `body` or per row: no `FileManager` calls, no `Data(contentsOf:)`, no date formatter creation. Resolve URLs when the library loads.
 - Covers go through the shared ImageIO thumbnail cache in `Cover` (decoded off the main thread at display size, `NSCache`). Don't use `AsyncImage` for covers.
-- Don't force table rebuilds with `.id(...)` on filter changes (measured 371 ms, worse than the 150 ms baseline).
-- SwiftUI `Table` itself costs about 100 ms per full row update at 529 books (row diffing, row height measurement, row teardown). If a change needs more speed, the next step is an `NSTableView` behind `NSViewRepresentable`, in its own PR.
-- Measure before and after any change to the library views with the perf harness below, using the real library size, and put the numbers in the PR body.
+- The library list is an `NSTableView` (`BookTable`, `NSViewRepresentable`) with a fixed row height whose cells are updated in place when the visible list changes. Don't go back to SwiftUI `Table`: when rows are inserted above the top visible row, AppKit builds a hosted row view for each one just to measure its automatic height (about 17 ms per row; Finished → All Books inserted 509 rows and froze the window for 9 s, In Audible Only → All Books 3 s). `.id(filter)` on the `Table` recreated it in 243 to 360 ms per switch, and `reloadData()` on the `NSTableView` cost 150 ms because it freed and rebuilt all 225 visible cells.
+- Cells are plain views laid out by hand (`LabelView`, `CoverView`), kept out of Auto Layout, drawn into one layer per row. `NSTextField` cells cost about 0.3 ms each to create, lay out, draw and free.
+- Measure before and after any change to the library views with the perf harness below, using the owner's data, every sidebar entry (not one convenient transition), sort and search, in the configuration the owner runs. PR #41 measured Finished → All Books on the merged library, whose Finished list happened to start with a recent purchase, and reported 110 to 150 ms while the owner saw 5 s.
 
 ## Debugging and measuring
 
-UI changes: render a snapshot and look at it. Debug builds read these environment variables:
+UI changes: render a snapshot and look at it. Debug builds, and any build launched with `LECTERN_HARNESS=1` (so Release can be measured), read these environment variables (`Harness.env`; without it they are inert):
 ```sh
 xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build CODE_SIGN_ENTITLEMENTS= ENABLE_HARDENED_RUNTIME=NO   # unsandboxed debug (without the entitlements, hardened runtime refuses the ad-hoc Sparkle.framework)
 open -g -n -W --env LECTERN_LIBRARY=<OpenAudible folder> --env LECTERN_SELECT=<asin> --env LECTERN_SNAPSHOT=/tmp/shot.png "build/Build/Products/Debug/Lectern Audio.app"
@@ -72,13 +72,16 @@ open -g -n -W --env LECTERN_LIBRARY=<OpenAudible folder> --env LECTERN_SELECT=<a
 - `LECTERN_PLAY=1` plays the `LECTERN_SELECT` book. `LECTERN_SYNCED_LIBRARY=<library.json>` merges a synced Audible list without signing in.
 - aria2c: a sandboxed Debug build with `--env LECTERN_ARIA2_TEST=<public https file> --stdout <file>` downloads it with aria2c, then URLSession only, and prints both durations.
 - Always launch test builds with `open -g` so they don't take the owner's focus, and check `ls -t ~/Library/Logs/DiagnosticReports | head` after each launch so crash dialogs aren't left for the owner. Quit the processes you start.
+- The owner's OpenAudible folder is on an external USB disk (`/Volumes/Mac`). An ad-hoc signed test build opening it blocks in `open()` on the removable-volume consent prompt until someone answers it (one stray build sat there for an hour). Copy `books.json` and `art/` to a local folder and point `LECTERN_LIBRARY` at the copy.
 
-Performance harness: `LECTERN_PERF_CYCLE=N` switches the sidebar Finished → All Books N times, prints main-thread ms per switch and body evaluations per view (`BodyCount.tick`), then quits; each switch is an "All Books" Points of Interest signpost for Instruments. `-viewMode YES` measures the cover grid. Measure optimized code with a separate bundle id:
+Performance harness: `LECTERN_PERF_CYCLE=N` switches each `LECTERN_PERF_FROM` entry (comma list: `finished`, `audibleOnly`, `downloaded`, `notConverted`, `reading`, `pdfs`, `genre:<name>`; `sort` flips All Books between Purchased and Title; `search` types "a" into All Books and clears it) to All Books and back N times, then quits. Per transition it prints the median `settled` (wall clock until the last main-thread span of 2 ms or more, measured from a background thread so a 9 s freeze inside a nested run loop is still seen), `first` (until the run loop first idles), `busy`, `longest` and body evaluations per view (`BodyCount.tick`); each switch is a "Filter switch" Points of Interest signpost. `-viewMode YES` measures the cover grid. Measure optimized code with a separate bundle id, and once in the Release configuration the owner runs:
 ```sh
 xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build/perf build CODE_SIGN_ENTITLEMENTS= ENABLE_HARDENED_RUNTIME=NO SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule PRODUCT_BUNDLE_IDENTIFIER=com.danihrndzld.lecternaudio.perf
-open -g -n -W --stdout /tmp/perf.txt --env LECTERN_LIBRARY=<OpenAudible folder> --env LECTERN_SYNCED_LIBRARY=<library.json> --env LECTERN_PERF_CYCLE=10 "build/perf/Build/Products/Debug/Lectern Audio.app" --args -viewMode NO
+open -g -n -W --stdout /tmp/perf.txt --env LECTERN_LIBRARY=<local copy of the OpenAudible folder> --env LECTERN_SYNCED_LIBRARY=<library.json> --env LECTERN_PERF_CYCLE=5 --env LECTERN_PERF_FROM=finished,audibleOnly,downloaded,notConverted,genre:History,sort,search "build/perf/Build/Products/Debug/Lectern Audio.app" --args -viewMode NO
+xcodebuild -scheme LecternAudio -configuration Release -destination platform=macOS -derivedDataPath build/release build CODE_SIGN_ENTITLEMENTS= ENABLE_HARDENED_RUNTIME=NO PRODUCT_BUNDLE_IDENTIFIER=com.danihrndzld.lecternaudio.perf
+open -g -n -W --stdout /tmp/perf-release.txt --env LECTERN_HARNESS=1 --env LECTERN_LIBRARY=<copy> --env LECTERN_PERF_CYCLE=5 --env LECTERN_PERF_FROM=finished,audibleOnly "build/release/Build/Products/Release/Lectern Audio.app" --args -viewMode NO
 ```
-`xcrun xctrace record --launch` resolves the app by name and can start the installed `/Applications/Lectern Audio.app` instead; record with `--all-processes` while your build runs. Run A/B comparisons alternately; other builds on the machine add noise.
+`xcrun xctrace record --launch` resolves the app by name and can start the installed `/Applications/Lectern Audio.app` instead; record with `--attach <pid>` or `--all-processes` while your build runs. `sample <pid> 10` gives the same call tree faster when a freeze is seconds long. Run A/B comparisons alternately; other builds on the machine add noise.
 
 ## Workflow
 

@@ -30,7 +30,7 @@ struct LecternAudioApp: App {
                     }
                     await debugSnapshot()
                     await debugAria2()
-                    await debugPerfCycle(library)
+                    await debugPerfCycle(library, player)
                 }
         }
         .commands { AppCommands(library: library, player: player, session: session, updater: updater) }
@@ -124,14 +124,49 @@ extension LibraryFilter {
 }
 
 /// `LECTERN_PERF_CYCLE=N` switches the sidebar filter N times each way between every `LECTERN_PERF_FROM` filter
-/// (comma list, default `finished`) and All Books, prints per transition how long the window takes to settle, and quits.
+/// (comma list, default `finished`; `sort` flips All Books between purchase date and title, `search` types "a" into All Books
+/// and clears it) and All Books, prints per transition how long the window takes to settle, and quits.
 /// Each switch is an os_signpost interval (Points of Interest) named after the transition.
-/// first = switch until the run loop first goes idle; settled = wall clock until the last main-thread work
-/// (nothing for 400 ms afterwards); busy = main-thread work until then; longest = worst uninterrupted span.
-@MainActor private func debugPerfCycle(_ library: LibraryModel) async {
+/// first = switch until the run loop first goes idle; settled = wall clock until the last main-thread span of 2 ms or
+/// more (nothing for 400 ms afterwards); busy = all main-thread work until then; longest = worst uninterrupted span.
+@MainActor private func debugPerfCycle(_ library: LibraryModel, _ player: Player) async {
     let env = Harness.env
     guard let n = env["LECTERN_PERF_CYCLE"].flatMap(Int.init), n > 0 else { return }
-    let froms = (env["LECTERN_PERF_FROM"] ?? "finished").split(separator: ",").compactMap(LibraryFilter.init(perfName:))
+    typealias Transition = (name: String, prepare: () -> Void, go: () -> Void)
+    var transitions: [Transition] = []
+    for name in (env["LECTERN_PERF_FROM"] ?? "finished").split(separator: ",") {
+        switch name {
+        case "sort":
+            let title = [BookComparator(.title)]
+            transitions.append(("All Books: sort Purchased → Title", { library.filter = .all; library.sortOrder = BookComparator.defaultOrder }, { library.sortOrder = title }))
+            transitions.append(("All Books: sort Title → Purchased", { library.filter = .all; library.sortOrder = title }, { library.sortOrder = BookComparator.defaultOrder }))
+        case "search":
+            transitions.append(("All Books: search \"\" → \"a\"", { library.filter = .all; library.search = "" }, { library.search = "a" }))
+            transitions.append(("All Books: search \"a\" → \"\"", { library.filter = .all; library.search = "a" }, { library.search = "" }))
+        case "scroll":
+            // The list's NSTableView (or the grid's scroll view): one page down from the top, and a jump to row 400.
+            func scrollView() -> NSScrollView? {
+                func find(_ v: NSView) -> NSScrollView? {
+                    if let s = v as? NSScrollView, s.documentView is NSTableView || s.frame.width > 400 { return s }
+                    for sub in v.subviews { if let s = find(sub) { return s } }
+                    return nil
+                }
+                return NSApp.windows.first?.contentView.flatMap(find)
+            }
+            func scroll(toRow row: Int) {
+                guard let scroll = scrollView() else { return }
+                let y = CGFloat(row) * ((scroll.documentView as? NSTableView)?.rowHeight ?? 220)
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: y))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+            transitions.append(("All Books: scroll one page", { library.filter = .all; scroll(toRow: 0) }, { scroll(toRow: 24) }))
+            transitions.append(("All Books: scroll to row 400", { library.filter = .all; scroll(toRow: 0) }, { scroll(toRow: 400) }))
+        default:
+            guard let f = LibraryFilter(perfName: name) else { continue }
+            transitions.append(("\(f.title) → All Books", { library.filter = f }, { library.filter = .all }))
+            transitions.append(("All Books → \(f.title)", { library.filter = .all }, { library.filter = f }))
+        }
+    }
     let spans = MainThreadSpans()
     // Wake-ups are seen first and sleeps last (after SwiftUI's own observers commit the update), nested run loops included.
     let wake = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.afterWaiting.rawValue, true, .min) { _, a in spans.record(a) }
@@ -147,29 +182,41 @@ extension LibraryFilter {
     func ms(_ d: Duration) -> Int { Int(d / .milliseconds(1)) }
     func median(_ xs: [Int]) -> Int { xs.sorted()[xs.count / 2] }
     let mode = env["LECTERN_PERF_LABEL"] ?? (UserDefaults.standard.bool(forKey: "viewMode") ? "grid" : "list")
-    for from in froms {
-        for (a, b) in [(from, LibraryFilter.all), (.all, from)] {
-            let name = "\(a.title) → \(b.title)"
-            var firsts: [Int] = [], busies: [Int] = [], longests: [Int] = [], settleds: [Int] = [], bodies: [String: [Int]] = [:]
-            for _ in 0..<n {
-                library.filter = a
-                _ = await spans.settle()
-                let state = signposter.beginInterval("Filter switch", id: signposter.makeSignpostID(), "\(name)")
-                BodyCount.counts = [:]
-                spans.start()
-                library.filter = b
-                let result = await spans.settle()
-                signposter.endInterval("Filter switch", state)
-                firsts.append(ms(result.first))
-                busies.append(ms(result.busy))
-                longests.append(ms(result.longest))
-                settleds.append(ms(result.settled))
-                for (view, count) in BodyCount.counts { bodies[view, default: []].append(count) }
+    for transition in transitions {
+        var firsts: [Int] = [], busies: [Int] = [], longests: [Int] = [], settleds: [Int] = [], bodies: [String: [Int]] = [:]
+        var counts = (before: 0, after: 0)
+        for _ in 0..<n {
+            spans.start()
+            transition.prepare()
+            _ = await spans.settle()
+            counts.before = library.visibleBooks.count
+            let state = signposter.beginInterval("Filter switch", id: signposter.makeSignpostID(), "\(transition.name)")
+            BodyCount.counts = [:]
+            spans.start()
+            transition.go()
+            let result = await spans.settle()
+            signposter.endInterval("Filter switch", state)
+            counts.after = library.visibleBooks.count
+            if env["LECTERN_PERF_TRACE"] != nil, settleds.isEmpty {
+                print("perf:   spans ≥ 2 ms (offset ms, length ms):", spans.trace.map { "(\(ms($0.offset)), \(ms($0.length)))" }.joined(separator: " "))
             }
-            print("perf: \(mode) \(name) x\(n), \(library.count(a)) → \(library.count(b)) of \(library.books.count) books, median ms: settled \(median(settleds)), first \(median(firsts)), busy \(median(busies)), longest \(median(longests))")
-            print("perf:   bodies:", bodies.sorted { $0.key < $1.key }.map { "\($0.key) \(median($0.value))" }.joined(separator: ", "))
-            print("perf:   settled \(settleds) first \(firsts) busy \(busies) longest \(longests)")
+            firsts.append(ms(result.first))
+            busies.append(ms(result.busy))
+            longests.append(ms(result.longest))
+            settleds.append(ms(result.settled))
+            for (view, count) in BodyCount.counts { bodies[view, default: []].append(count) }
         }
+        print("perf: \(mode) \(transition.name) x\(n), \(counts.before) → \(counts.after) of \(library.books.count) books, median ms: settled \(median(settleds)), first \(median(firsts)), busy \(median(busies)), longest \(median(longests))")
+        print("perf:   bodies:", bodies.sorted { $0.key < $1.key }.map { "\($0.key) \(median($0.value))" }.joined(separator: ", "))
+        print("perf:   settled \(settleds) first \(firsts) busy \(busies) longest \(longests)")
+    }
+    library.search = ""
+    print("perf: selection after the cycles:", library.selection.sorted(), "sort:", library.sortOrder.map { "\($0.column) \($0.order)" })
+    if let book = library.visibleBooks.first {
+        // The context menu is built outside the view tree (CLAUDE.md); check that it still builds with its items.
+        let menu = NSHostingMenu(rootView: BookActions(book: book, model: library, player: player))
+        menu.update()
+        print("perf: context menu for \(book.title):", menu.items.map(\.title))
     }
     fflush(stdout)
     NSApp.terminate(nil)
@@ -183,6 +230,7 @@ nonisolated private final class MainThreadSpans: @unchecked Sendable {  // guard
     private var busySince: ContinuousClock.Instant?
     private var all: [Duration] = []
     private var lastEnd = ContinuousClock.now
+    private(set) var trace: [(offset: Duration, length: Duration)] = []
 
     /// Called on the main thread for every run-loop activity.
     func record(_ activity: CFRunLoopActivity) {
@@ -194,7 +242,7 @@ nonisolated private final class MainThreadSpans: @unchecked Sendable {  // guard
             if let since = busySince {
                 let span = now - since
                 all.append(span)
-                if span >= .microseconds(200) { lastEnd = now }
+                if span >= .milliseconds(2) { lastEnd = now; trace.append((since - origin, span)) }  // shorter spans are scroller fades and timers, not lag
                 busySince = nil
             }
         default: break
@@ -207,14 +255,21 @@ nonisolated private final class MainThreadSpans: @unchecked Sendable {  // guard
         busySince = origin
         lastEnd = origin
         all = []
+        trace = []
     }
 
-    /// Waits off the main thread until it has done nothing for 400 ms (at most 20 s).
+    /// Waits off the main thread until it has done nothing for 400 ms (at most 20 s). A ping is also dispatched to the
+    /// main queue every 25 ms; one answered late marks the main thread busy whatever the observers saw.
     func settle() async -> (first: Duration, busy: Duration, longest: Duration, settled: Duration) {
         let origin = lock.withLock { self.origin }
         await Task.detached(priority: .userInitiated) { [self] in
             while ContinuousClock.now - origin < .seconds(20) {
                 try? await Task.sleep(for: .milliseconds(25))
+                let sent = ContinuousClock.now
+                DispatchQueue.main.async { [self] in
+                    let now = ContinuousClock.now
+                    if now - sent > .milliseconds(2) { lock.withLock { lastEnd = max(lastEnd, now) } }
+                }
                 let quietFor = lock.withLock { ContinuousClock.now - (busySince ?? lastEnd) }
                 if lock.withLock({ busySince == nil }), quietFor >= .milliseconds(400) { break }
             }
