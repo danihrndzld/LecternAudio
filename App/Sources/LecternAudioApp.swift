@@ -5,10 +5,11 @@ import SwiftUI
 
 @main
 struct LecternAudioApp: App {
-    @State private var library = LibraryModel()
+    // As the snapshot tests' host the app stays inert: no saved library, no Keychain session, no updater.
+    @State private var library = LibraryModel(restoring: !Harness.testHost)
     @State private var player = Player()
-    @State private var session = AudibleSession()
-    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    @State private var session = AudibleSession(loadKeychain: !Harness.testHost)
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: !Harness.testHost, updaterDelegate: nil, userDriverDelegate: nil)
     private var updater: SPUUpdater { updaterController.updater }
 
     var body: some Scene {
@@ -33,6 +34,8 @@ struct LecternAudioApp: App {
                     await debugPerfCycle(library, player)
                 }
         }
+        // The tests build their own windows; this one crashed the host under Xcode 27.1 before they ran.
+        .defaultLaunchBehavior(Harness.testHost ? .suppressed : .automatic)
         .commands { AppCommands(library: library, player: player, session: session, updater: updater) }
 
         Window("Sign In to Audible", id: SignInView.windowID) {
@@ -58,6 +61,8 @@ enum Harness {
     static let enabled = ProcessInfo.processInfo.environment["LECTERN_HARNESS"] == "1"
     #endif
     static let env: [String: String] = enabled ? ProcessInfo.processInfo.environment : [:]
+    /// The app is hosting the XCTest bundle.
+    static let testHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 }
 
 /// `LECTERN_SNAPSHOT=/path/out.png` renders the main window to a PNG and quits; no screen-recording permission needed.
