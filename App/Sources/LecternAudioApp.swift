@@ -14,28 +14,33 @@ struct LecternAudioApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(library)
-                .environment(player)
-                .environment(session)
-                .frame(minWidth: 900, minHeight: 560)
-                .task {
-                    guard Harness.enabled else { return }
-                    if Harness.env["LECTERN_CONVERSION_PREVIEW"] == "1", let book = library.selectedBook {
-                        library.conversion.book = book
+            // As the snapshot tests' host the window stays empty: the tests build their own windows, and
+            // this one crashed the Debug host on macOS 27 before they ran. Not .defaultLaunchBehavior,
+            // which made an empty Release launch crash in the same constraint pass.
+            if Harness.testHost {
+                Color.clear
+            } else {
+                ContentView()
+                    .environment(library)
+                    .environment(player)
+                    .environment(session)
+                    .frame(minWidth: 900, minHeight: 560)
+                    .task {
+                        guard Harness.enabled else { return }
+                        if Harness.env["LECTERN_CONVERSION_PREVIEW"] == "1", let book = library.selectedBook {
+                            library.conversion.book = book
+                        }
+                        // LECTERN_PLAY=1 plays the selected book, to reproduce player-bar layout issues.
+                        if Harness.env["LECTERN_PLAY"] == "1", let book = library.selectedBook,
+                           let url = library.library?.audioURL(for: book) {
+                            player.play(book, url: url)
+                        }
+                        await debugSnapshot()
+                        await debugAria2()
+                        await debugPerfCycle(library, player)
                     }
-                    // LECTERN_PLAY=1 plays the selected book, to reproduce player-bar layout issues.
-                    if Harness.env["LECTERN_PLAY"] == "1", let book = library.selectedBook,
-                       let url = library.library?.audioURL(for: book) {
-                        player.play(book, url: url)
-                    }
-                    await debugSnapshot()
-                    await debugAria2()
-                    await debugPerfCycle(library, player)
-                }
+            }
         }
-        // The tests build their own windows; this one crashed the host under Xcode 27.1 before they ran.
-        .defaultLaunchBehavior(Harness.testHost ? .suppressed : .automatic)
         .commands { AppCommands(library: library, player: player, session: session, updater: updater) }
 
         Window("Sign In to Audible", id: SignInView.windowID) {
