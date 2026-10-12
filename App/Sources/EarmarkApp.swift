@@ -6,7 +6,8 @@ struct EarmarkApp: App {
     @State private var library = LibraryModel()
     @State private var player = Player()
     @State private var session = AudibleSession()
-    private let updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil).updater
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    private var updater: SPUUpdater { updaterController.updater }
 
     var body: some Scene {
         WindowGroup {

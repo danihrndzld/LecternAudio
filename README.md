@@ -41,7 +41,7 @@ If you prefer the Terminal, this command removes the download flag instead, and 
 xattr -dr com.apple.quarantine /Applications/Earmark.app
 ```
 
-You only do this once. Earmark checks for new versions once a day with Sparkle, and you can also choose Help, then Check for Updates. Sparkle verifies each update with Earmark's signing key, installs it, and relaunches the app without asking you to approve it again. You can turn off the daily check in Settings.
+You only do this once. Earmark checks for new versions once a day with Sparkle, and you can also choose Help, then Check for Updates. When a new version is out, Sparkle shows it with an Install Update button, checks it against Earmark's signing key, and relaunches the app. macOS doesn't ask you to approve the updated app again. You can turn off the daily check in Settings.
 
 ## Requirements
 
