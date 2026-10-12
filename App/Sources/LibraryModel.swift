@@ -54,14 +54,17 @@ final class LibraryModel {
     @ObservationIgnored private var scopedRoot: URL?
     /// Imported files whose security scope is open for this app session.
     @ObservationIgnored var scopedImports: Set<URL> = []
-    /// Progress (0...1) of running MP3 and Ogg Vorbis exports.
-    private(set) var exports: [Book.ID: Double] = [:]
-    @ObservationIgnored private var exportTasks: [Book.ID: Task<Void, Never>] = [:]
+    /// The MP3 and Ogg Vorbis export queue, two encodes at a time.
+    let exports = ExportModel()
 
     private static let bookmarkKey = "libraryBookmark"
 
     init() {
         Prefs.register()
+        exports.run = { [weak self] job, progress in
+            guard let self else { throw CancellationError() }
+            try await runExport(job, progress: progress)
+        }
         restore()
         restoreImports()
     }
@@ -232,7 +235,7 @@ final class LibraryModel {
     }
 
     var isRunningJobs: Bool {
-        isSyncing || conversion.isRunning || downloads.pendingCount > 0 || !exports.isEmpty || jobCount > 0
+        isSyncing || conversion.isRunning || downloads.pendingCount > 0 || exports.isBusy || jobCount > 0
     }
 
     /// Controls ▸ Cancel All Jobs, through each job's own cancel API.
@@ -240,7 +243,7 @@ final class LibraryModel {
         syncTask?.cancel()
         conversion.cancel()
         for job in downloads.jobs where [.queued, .licensing, .downloading, .converting].contains(job.state) { downloads.cancel(job.id) }
-        exportTasks.values.forEach { $0.cancel() }
+        exports.cancelAll()
         jobs.values.forEach { $0.cancel() }
         AppLog.shared.info("Cancelled all jobs")
     }
@@ -254,7 +257,7 @@ final class LibraryModel {
 
     /// Asks where to save, then converts the book's M4B to MP3 or Ogg Vorbis (`ext` "mp3" or "ogg", options from Settings) in the background.
     func exportAudio(_ book: Book, ext: String, byChapter: Bool) {
-        guard let source = m4bURL(for: book), exportTasks[book.id] == nil else { return }
+        guard let source = m4bURL(for: book), !exports.isExporting(book.id) else { return }
         let name = Book.fileName(book.title, fallback: book.asin.isEmpty ? "Book" : book.asin)
         let destination: URL
         if byChapter {
@@ -276,10 +279,34 @@ final class LibraryModel {
         export(book, ext: ext, source: source, to: destination, byChapter: byChapter)
     }
 
-    /// The exporters write `<file>.part` and rename it when done.
+    /// Queues one export. The exporters write `<file>.part` and rename it when done.
     private func export(_ book: Book, ext: String, source: URL, to destination: URL, byChapter: Bool) {
-        guard exportTasks[book.id] == nil else { return }
+        guard let format = ExportJob.Format(rawValue: ext) else { return }
+        exports.enqueue(ExportJob(bookID: book.id, title: book.title, format: format, byChapter: byChapter,
+                                  source: source, destination: destination))
+    }
+
+    /// Runs one queued export. Called by `ExportModel` when a slot frees up, so the tag and the format
+    /// settings are read when the encode actually starts and a retry picks up any change since.
+    private func runExport(_ job: ExportJob, progress: @escaping @Sendable (Double) -> Void) async throws {
+        let tag = exportTag(for: job)
+        var mp3 = Prefs.mp3Options, ogg = Prefs.oggOptions
+        mp3.splitChapters = job.byChapter
+        ogg.splitChapters = job.byChapter
+        switch job.format {
+        case .ogg: try await OggExport.run(source: job.source, destination: job.destination, tag: tag, options: ogg, progress: progress)
+        case .mp3: try await MP3Export.run(source: job.source, destination: job.destination, tag: tag, options: mp3, progress: progress)
+        }
+    }
+
+    private func exportTag(for job: ExportJob) -> ID3Tag {
         var tag = ID3Tag()
+        // A book dropped from the library between queueing and encoding still exports, with its title.
+        guard let book = books.first(where: { $0.id == job.bookID }) else {
+            tag.title = job.title
+            tag.album = job.title
+            return tag
+        }
         tag.title = book.title
         tag.album = book.title
         tag.artist = book.author
@@ -288,33 +315,13 @@ final class LibraryModel {
         tag.year = book.releaseDate.map { String(Calendar.current.component(.year, from: $0)) } ?? ""
         tag.comment = HTMLText.markdown(book.summary)
         tag.cover = (library?.artURL(for: book) ?? book.imageURL).flatMap { $0.isFileURL ? try? Data(contentsOf: $0) : nil }
-        var mp3 = Prefs.mp3Options, ogg = Prefs.oggOptions
-        mp3.splitChapters = byChapter
-        ogg.splitChapters = byChapter
-
-        let id = book.id
-        exports[id] = 0
-        exportTasks[id] = Task {
-            do {
-                let progress: @Sendable (Double) -> Void = { p in
-                    Task { @MainActor in if self.exports[id] != nil { self.exports[id] = p } }
-                }
-                if ext == "ogg" {
-                    try await OggExport.run(source: source, destination: destination, tag: tag, options: ogg, progress: progress)
-                } else {
-                    try await MP3Export.run(source: source, destination: destination, tag: tag, options: mp3, progress: progress)
-                }
-                Prefs.playCompletionSound()
-            } catch is CancellationError {
-            } catch {
-                NSAlert(error: error).runModal()
-            }
-            exports[id] = nil
-            exportTasks[id] = nil
-        }
+        return tag
     }
 
-    func cancelExport(_ id: Book.ID) { exportTasks[id]?.cancel() }
+    func cancelExport(_ id: Book.ID) { exports.cancelExport(for: id) }
+
+    /// Progress of a book's in-flight export, for its row and the inspector.
+    func exportProgress(for id: Book.ID) -> Double? { exports.progress(for: id) }
 
     private func restore() {
         // Lets agents and screenshots open a library without the folder picker (build with CODE_SIGN_ENTITLEMENTS= to drop the sandbox).

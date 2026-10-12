@@ -23,7 +23,7 @@ struct BookDetail: View {
                     .buttonStyle(.borderedProminent).controlSize(.large)
                 }
 
-                if let progress = model.exports[book.id] {
+                if let progress = model.exportProgress(for: book.id) {
                     HStack {
                         ProgressView("Exporting…", value: progress)
                         Button("Cancel", systemImage: "xmark.circle.fill") { model.cancelExport(book.id) }

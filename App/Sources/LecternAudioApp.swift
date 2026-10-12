@@ -70,7 +70,14 @@ enum Harness {
     window.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
     try? await Task.sleep(for: .seconds(3))
     let previewSheet = env["LECTERN_CONVERSION_PREVIEW"] == "1" || env["LECTERN_DOWNLOADS_PREVIEW"] == "1"
-    let target = previewSheet ? (window.attachedSheet ?? window) : window
+    // A popover is a child window, not a sheet.
+    let target: NSWindow = if previewSheet {
+        window.attachedSheet ?? window
+    } else if env["LECTERN_EXPORTS_PREVIEW"] == "1" {
+        window.childWindows?.last ?? window
+    } else {
+        window
+    }
     guard let view = target.contentView?.superview else { return }
     guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
     view.cacheDisplay(in: view.bounds, to: rep)

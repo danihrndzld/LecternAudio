@@ -159,7 +159,7 @@ struct BookActions: View {
             Button(downloadable.count > 1 ? "Download and Convert \(downloadable.count) Books" : "Download and Convert",
                    systemImage: "arrow.down.circle") { model.downloads.enqueue(downloadable) }
         }
-        if model.exports[book.id] != nil {
+        if model.exportProgress(for: book.id) != nil {
             Button("Cancel Export", systemImage: "xmark.circle") { model.cancelExport(book.id) }
         } else if model.m4bURL(for: book) != nil {
             Button("Export MP3…", systemImage: "square.and.arrow.up") { model.exportAudio(book, ext: "mp3", byChapter: false) }

@@ -55,6 +55,9 @@ struct ContentView: View {
                     .help("Download queue (\(model.downloads.pendingCount) pending)")
             }
             ToolbarItem {
+                ExportsButton(exports: model.exports)
+            }
+            ToolbarItem {
                 Picker("View", selection: $gridMode) {
                     Label("List", systemImage: "list.bullet").tag(false)
                     Label("Covers", systemImage: "square.grid.2x2").tag(true)
@@ -200,6 +203,31 @@ private struct Onboarding: View {
         } actions: {
             Button("Choose Folder…") { model.isPickingFolder = true }
                 .buttonStyle(.borderedProminent)
+        }
+    }
+}
+
+
+/// Toolbar activity button for the export queue. A leaf view so the counts it reads keep their
+/// observation out of `ContentView`'s body (performance rules in CLAUDE.md).
+private struct ExportsButton: View {
+    let exports: ExportModel
+    @State private var showExports = false
+
+    var body: some View {
+        let _ = BodyCount.tick("ExportsButton")
+        let counts = exports.counts
+        let pending = counts.queued + counts.running
+        Button {
+            showExports = true
+        } label: {
+            Label("Exports", systemImage: pending > 0 ? "square.and.arrow.up.badge.clock" : "square.and.arrow.up")
+        }
+        .help(pending > 0 ? "Exports (\(pending) pending)" : "Exports")
+        .popover(isPresented: $showExports, arrowEdge: .bottom) { ExportsView(exports: exports) }
+        .task {
+            exports.seedPreview()
+            if Harness.env["LECTERN_EXPORTS_PREVIEW"] == "1" { showExports = true }
         }
     }
 }
