@@ -1,0 +1,58 @@
+{
+  "response_groups": ["product_attrs", "listening_status", "rating", "media"],
+  "items": [
+    {
+      "asin": "B0BXXXX001",
+      "sku_lite": "BK_TEST_000001",
+      "title": "Sapiens &amp; Friends",
+      "authors": [{ "name": "Yuval Noah Harari" }],
+      "narrators": [{ "name": "Narrador de Prueba" }],
+      "publisher_name": "Editorial de Prueba",
+      "publisher_summary": "<p>Un <b>resumen</b>.</p>",
+      "runtime_length_min": 710,
+      "release_date": "2018-09-04",
+      "purchase_date": "2024-01-05T09:10:11.000Z",
+      "language": "spanish",
+      "category_ladders": [{ "ladder": [{ "id": "1", "name": "Historia" }], "root": "Genres" }],
+      "product_images": { "500": "https://m.media-amazon.com/images/I/test-es-1._SL500_.jpg" },
+      "is_finished": true,
+      "percent_complete": 100
+    },
+    {
+      "asin": "B0BXXXX002",
+      "sku_lite": "BK_TEST_000002",
+      "title": "Finished Book",
+      "authors": [{ "name": "Test Author" }],
+      "runtime_length_min": 60,
+      "purchase_date": "2024-02-06T09:10:11.000Z",
+      "is_finished": false,
+      "percent_complete": 0
+    },
+    {
+      "asin": "B0BXXXX101",
+      "sku_lite": "BK_TEST_000101",
+      "title": "Solo en España",
+      "authors": [{ "name": "Autora de Prueba" }],
+      "narrators": [{ "name": "Narradora de Prueba" }],
+      "publisher_name": "Editorial de Prueba",
+      "runtime_length_min": 120,
+      "release_date": "2020-05-01",
+      "purchase_date": "2024-03-07T09:10:11.000Z",
+      "category_ladders": [{ "ladder": [{ "id": "4", "name": "Ficción" }], "root": "Genres" }],
+      "rating": { "overall_distribution": { "average_rating": 4.1, "num_ratings": 222 } },
+      "product_images": { "500": "https://m.media-amazon.com/images/I/test-es-101._SL500_.jpg" },
+      "is_finished": false,
+      "percent_complete": 10
+    },
+    {
+      "asin": "B0BXXXX102",
+      "sku_lite": "BK_TEST_000102",
+      "title": "Segundo Libro Español",
+      "authors": [{ "name": "Autora de Prueba" }],
+      "runtime_length_min": 30,
+      "purchase_date": "2024-04-08T09:10:11.000Z",
+      "category_ladders": [{ "ladder": [{ "id": "4", "name": "Ficción" }], "root": "Genres" }],
+      "is_finished": false
+    }
+  ]
+}

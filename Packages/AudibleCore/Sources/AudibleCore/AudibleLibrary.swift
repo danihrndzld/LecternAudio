@@ -104,6 +104,50 @@ public enum AudibleLibrary {
             chapters: [], files: [])
     }
 
+    /// One signed-in account's synced catalog.
+    public struct AccountCatalog: Sendable {
+        public let id: String
+        public let books: [Book]
+
+        public init(id: String, books: [Book]) {
+            self.id = id
+            self.books = books
+        }
+    }
+
+    /// Merges the catalogs of several accounts into one list, by ASIN.
+    ///
+    /// The first account that owns a book supplies its metadata, so `accounts` order (sign-in order)
+    /// decides ties. Owners accumulate in `Book.accountIDs`, and a book counts as finished if any
+    /// account finished it, or as being listened to if any account is listening. Books only a later
+    /// account owns are appended in that account's own order, so the result is stable across syncs.
+    /// The result still goes through `merge(audible:local:)` to pick up local files (issue #47).
+    public static func merge(accounts: [AccountCatalog]) -> [Book] {
+        var merged: [Book] = []
+        var index: [Book.ID: Int] = [:]
+        for account in accounts {
+            for book in account.books {
+                guard let found = index[book.id] else {
+                    var first = book
+                    first.accountIDs = [account.id]
+                    index[book.id] = merged.count
+                    merged.append(first)
+                    continue
+                }
+                if !merged[found].accountIDs.contains(account.id) { merged[found].accountIDs.append(account.id) }
+                merged[found].readStatus = furthest(merged[found].readStatus, book.readStatus)
+            }
+        }
+        return merged
+    }
+
+    /// The further along of two accounts' read status for the same book.
+    static func furthest(_ a: ReadStatus?, _ b: ReadStatus?) -> ReadStatus? {
+        if a == .finished || b == .finished { return .finished }
+        if a == .reading || b == .reading { return .reading }
+        return a ?? b
+    }
+
     /// Audible gives the list and metadata; the OpenAudible folder gives files, chapters and read status.
     /// Files are the local ones plus any `audible`-side file of another type (OpenAudible's PDF, art, AAX beside a download).
     /// Books only in the folder (not on this account) are kept after the Audible ones.

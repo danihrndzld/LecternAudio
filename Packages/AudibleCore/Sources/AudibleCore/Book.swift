@@ -71,6 +71,12 @@ public struct Book: Identifiable, Hashable, Sendable {
     public var imageURL: URL?
     public var chapters: [Chapter]
     public var files: [BookFile]
+    /// The accounts that own this book, in sign-in order, as `AudibleAccount.storageID`.
+    ///
+    /// Derived state: filled in by `AudibleLibrary.merge(accounts:)` and deliberately absent from
+    /// `CodingKeys`, so the saved catalog, `books.json` and `queue.json` keep their existing format
+    /// and a book's ownership is recomputed on every sync rather than persisted (issue #47).
+    public var accountIDs: [String] = []
 
     public var hasAudio: Bool { files.contains { [.m4b, .mp3].contains($0.type) } }
     public var hasEncrypted: Bool { files.contains { [.aax, .aaxc].contains($0.type) } }
