@@ -24,7 +24,7 @@ jobs:
       - run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag must look like v1.2.3, got $TAG"; exit 1; }
           git checkout "refs/tags/$TAG"
-      # Saved by ci.yml on pushes to main (both architectures). A tag can't reuse caches saved on another tag.
+      # Saved by ci.yml on pushes to main (arm64, the runner's architecture). A tag can't reuse caches saved on another tag.
       - uses: actions/cache/restore@v4
         with:
           path: |
