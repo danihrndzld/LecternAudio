@@ -15,6 +15,9 @@ struct ContentView: View {
     @AppStorage(Prefs.appearance) private var appearance = "system"
 
     var body: some View {
+        #if DEBUG
+        let _ = BodyCount.tick("ContentView")
+        #endif
         @Bindable var model = model
         NavigationSplitView {
             Sidebar()
@@ -131,6 +134,9 @@ private struct Sidebar: View {
     @Environment(LibraryModel.self) private var model
 
     var body: some View {
+        #if DEBUG
+        let _ = BodyCount.tick("Sidebar")
+        #endif
         @Bindable var model = model
         List(selection: Binding($model.filter)) {
             Section("Library") {

@@ -113,6 +113,12 @@ final class LibraryModel {
         accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Lectern Audio/accounts/\($0)") }
         downloadedLibrary = accountRoot.flatMap { try? OpenAudibleLibrary(root: $0) }
         audibleBooks = store.map { AudibleLibrary.load(from: $0) } ?? []
+        #if DEBUG
+        // LECTERN_SYNCED_LIBRARY=<library.json> loads a synced Audible list without signing in (perf runs on real data).
+        if identity == nil, let path = ProcessInfo.processInfo.environment["LECTERN_SYNCED_LIBRARY"] {
+            audibleBooks = AudibleLibrary.load(from: URL(fileURLWithPath: path))
+        }
+        #endif
         lastSync = identity.flatMap { UserDefaults.standard.object(forKey: "lastSync.\($0)") as? Date }
         downloads.configure(session: session, library: self, root: accountRoot)
         if identity == nil { conversion.cancel() }
