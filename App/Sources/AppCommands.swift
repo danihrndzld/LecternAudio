@@ -1,5 +1,6 @@
 import AppKit
 import AudibleCore
+import Sparkle
 import SwiftUI
 
 /// The menu bar. Models are passed in: menus are hosted outside the window tree, so they never read `@Environment` objects.
@@ -7,6 +8,7 @@ struct AppCommands: Commands {
     let library: LibraryModel
     let player: Player
     let session: AudibleSession
+    let updater: SPUUpdater
 
     var body: some Commands {
         CommandGroup(replacing: .appInfo) {
@@ -26,7 +28,7 @@ struct AppCommands: Commands {
         }
         PlayerCommands(library: library, player: player)
         ViewCommands(library: library)
-        HelpCommands(library: library, session: session)
+        HelpCommands(library: library, session: session, updater: updater)
     }
 }
 
@@ -255,6 +257,7 @@ private struct ViewCommands: Commands {
 private struct HelpCommands: Commands {
     let library: LibraryModel
     let session: AudibleSession
+    let updater: SPUUpdater
 
     var body: some Commands {
         CommandGroup(replacing: .help) {
@@ -262,47 +265,12 @@ private struct HelpCommands: Commands {
                 .keyboardShortcut(functionKey(NSF1FunctionKey), modifiers: [])
             Button("Earmark Web Page") { NSWorkspace.shared.open(AppInfo.repo) }
             Divider()
-            Button("Check for Updates…") { Task { await checkForUpdates() } }
+            Button("Check for Updates…") { updater.checkForUpdates() }
                 .keyboardShortcut("u")
             Button("Send Bug Report…") { NSWorkspace.shared.open(AppInfo.bugReportURL) }
             Button("Diagnostics") {
                 AuxWindow.show("diagnostics", title: "Diagnostics") { DiagnosticsView(library: library, session: session) }
             }
         }
-    }
-
-    private func checkForUpdates() async {
-        let alert = NSAlert()
-        var request = URLRequest(url: UpdateCheck.latestReleaseURL)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            let status = (response as? HTTPURLResponse)?.statusCode
-            if status == 404 {
-                alert.messageText = "You're up to date (no releases yet)."
-            } else if status == 200, let tag = UpdateCheck.tag(fromRelease: data) {
-                if UpdateCheck.isNewer(tag, than: AppInfo.version) {
-                    alert.messageText = "Earmark \(tag) is available."
-                    alert.informativeText = "You have \(AppInfo.version)."
-                    alert.addButton(withTitle: "Open Releases")
-                    alert.addButton(withTitle: "Later")
-                    if alert.runModal() == .alertFirstButtonReturn {
-                        NSWorkspace.shared.open(AppInfo.repo.appending(path: "releases/latest"))
-                    }
-                    AppLog.shared.info("Update check: \(tag) available")
-                    return
-                }
-                alert.messageText = "You're up to date."
-                alert.informativeText = "Earmark \(AppInfo.version) is the latest version."
-            } else {
-                throw AudibleError("GitHub answered with status \(status ?? 0).")
-            }
-            AppLog.shared.info("Update check: up to date")
-        } catch {
-            alert.messageText = "Could not check for updates."
-            alert.informativeText = error.localizedDescription
-            AppLog.shared.error("Update check failed: \(error.localizedDescription)")
-        }
-        alert.runModal()
     }
 }
