@@ -43,8 +43,8 @@ struct DownloadsView: View {
             }
             if let error = downloads.error { Text(error).foregroundStyle(.red).font(.callout) }
             HStack {
-                Button("Download Missing Books") { downloads.enqueue(library.books) }
-                    .disabled(!library.books.contains(where: library.canDownload))
+                Button("Download Missing Books…") { library.downloadAll() }
+                    .disabled(library.downloadableCount == 0)
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }

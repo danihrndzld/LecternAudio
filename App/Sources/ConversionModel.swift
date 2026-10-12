@@ -15,6 +15,9 @@ final class ConversionModel {
     private let converter = AAXConverter()
     private var task: Task<Void, Never>?
     private(set) var usesAccountKey = false
+    /// Called with the outcome when a conversion ends, so `LibraryModel` can run a whole library's
+    /// worth of AAX files one after another (Controls ▸ Convert All to M4B). Cleared when it stops.
+    @ObservationIgnored var onFinish: ((Bool) -> Void)?
 
     var ffmpegURL: URL? {
         Bundle.main.executableURL?.deletingLastPathComponent().deletingLastPathComponent()
@@ -23,6 +26,7 @@ final class ConversionModel {
 
     func prepare(_ book: Book) {
         guard !isRunning else { return }
+        onFinish = nil
         self.book = book
         usesAccountKey = false
         activationBytes = ""
@@ -57,15 +61,24 @@ final class ConversionModel {
                 isRunning = false
                 task = nil
                 message = (error as? AudibleError)?.message ?? "Could not activate this account. Sign in again or retry."
+                // Activation fails for every book of this account, so a batch must stop here.
+                onFinish?(false)
             }
         }
     }
 
     func start(libraryModel: LibraryModel) {
-        guard !isRunning, let book, let library = libraryModel.library,
-              let input = library.aaxURL(for: book), let output = library.conversionOutput(for: book) else { return }
+        guard !isRunning else { return }
+        // Every other early return reports to a Convert All run, so it stops instead of staying armed
+        // for the next manual conversion.
+        guard let book, let library = libraryModel.library,
+              let input = library.aaxURL(for: book), let output = library.conversionOutput(for: book) else {
+            onFinish?(false)
+            return
+        }
         guard let ffmpegURL else {
             message = "The bundled conversion tool is missing. Rebuild or reinstall Lectern Audio."
+            onFinish?(false)
             return
         }
         let key: ActivationBytes
@@ -77,6 +90,7 @@ final class ConversionModel {
             }
         } catch {
             message = error.localizedDescription
+            onFinish?(false)
             return
         }
         activationBytes = ""
@@ -89,7 +103,8 @@ final class ConversionModel {
         }
         let request = AAXConversionRequest(input: input, output: output, book: book, cover: cover)
         task = Task { [self] in
-            defer { isRunning = false; task = nil }
+            // `succeeded` and `message` are set by the time this runs, so a batch can read the outcome.
+            defer { isRunning = false; task = nil; onFinish?(succeeded) }
             do {
                 // Shares the limit with the download queue's conversions (Settings, Simultaneous conversions).
                 let converted = try await Prefs.conversions.run { [converter] in
