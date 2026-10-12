@@ -27,7 +27,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
   library bookmark. As the test host (`Harness.testHost`) the app skips the restore, the Keychain and Sparkle.
 - One test: `swift test --package-path Packages/AudibleCore --filter <testFunctionName>` (Swift Testing `@Test` functions).
 - The first app build compiles FFmpeg 8.0 and aria2 1.37.0 from checksum-pinned tarballs (`scripts/build-ffmpeg.sh`, `scripts/build-aria2.sh`, run as post-build scripts) and caches them under `build/`.
-- Release locally: `scripts/release.sh <version> <build>` builds an Apple silicon (arm64) app, signs it ad-hoc inside out, makes the DMG and ZIP, and writes `appcast.xml` signed with the Sparkle EdDSA key (from `SPARKLE_PRIVATE_KEY` or the login Keychain). CI does the same on `v*` tags (`.github/workflows/release.yml`).
+- Release locally: `scripts/release.sh <version> <build>` builds an Apple silicon (arm64) app, signs it ad-hoc inside out, makes the DMG and ZIP, and writes `appcast.xml` signed with the Sparkle EdDSA key (from `SPARKLE_PRIVATE_KEY` or the login Keychain). CI does the same on `v*` tags (`.github/workflows/release.yml`). To release: merge a PR that sets `MARKETING_VERSION` in `project.yml`, push the tag `vX.Y.Z` on that commit, then replace the generated notes with `gh release edit --notes-file`.
 - Running tests rewrites `Packages/AudibleCore/Package.resolved` with a Sparkle pin; don't commit that churn unless dependencies changed.
 
 ## Architecture
@@ -40,6 +40,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
   - `Player` wraps AVPlayer with chapters, Now Playing and saved positions.
   - `AppCommands` builds every menu; models are passed in explicitly. `SettingsView` holds `Prefs` keys and the settings panes.
 - Bundled helpers live in `Contents/Helpers` (`ffmpeg`, `aria2c`) with `inherit` sandbox entitlements (`App/FFmpeg.entitlements`, `App/Aria2.entitlements`); run alone they crash at sandbox init, which is expected. aria2c gets the signed URL on stdin, never in argv.
+- The Keychain item is in the file-based keychain, whose access list trusts the app by its designated requirement. An ad-hoc signature's requirement is its cdhash, so every new build or version asks for the Mac password once ("Always Allow" lasts until the next version). Touch ID and the data protection keychain need `keychain-access-groups`, which needs a provisioning profile, so they don't work with ad-hoc signing.
 - Sparkle 2 handles updates. The feed URL is the single build setting `LECTERN_FEED_URL` in `project.yml`. The app is ad-hoc signed (no Developer ID), so `com.apple.security.cs.disable-library-validation` is required for Sparkle.framework to load under the hardened runtime, and EdDSA is the only update trust path.
 
 ## Rules
@@ -52,6 +53,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
 - Paths built from `books.json` or titles go through `OpenAudibleLibrary.url(for:)` (stays inside its folder) and `Book.fileName(_:fallback:)`. Only open files with an expected extension.
 - Views inside `Table` rows and context menus must not read `@Environment` objects (they crashed: AppKit hosts them outside the window tree); pass dependencies in (see `Cover`, `BookActions`).
 - Views shown/hidden inside a `NavigationSplitView` column (player bar, banners) must not raise the column's minimum width: give them `.frame(minWidth: 0, maxWidth: .infinity)`. A growing min size is applied mid constraint pass and crashes AppKit. Reproduce with `LECTERN_PLAY=1`.
+- A refused license is explained from `content_license.license_denial_reasons` (`AudibleContent.denialMessage`). Show only the `validationType` and `rejectionReason` codes, never Audible's `message`, which can contain the customer ID. Check `CustomerThrottled` first: a throttled request also fails the Ownership check.
 - Never use `NSAttributedString` HTML import; use `HTMLText.markdown`.
 - The sign-in window is only Amazon's page. Don't add native fields or overlays above it (the owner rejected that for Passwords AutoFill).
 - `books/Earmark/` and `earmark-conversions.json` inside the user's OpenAudible folder keep the old name on purpose so earlier conversions are still found; do not rename them.
@@ -79,6 +81,7 @@ open -g -n -W --env LECTERN_LIBRARY=<OpenAudible folder> --env LECTERN_SELECT=<a
 - The sidebar renders black in snapshots (vibrancy isn't captured by `cacheDisplay`); that is expected.
 - `LECTERN_PLAY=1` plays the `LECTERN_SELECT` book. `LECTERN_SYNCED_LIBRARY=<library.json>` merges a synced Audible list without signing in.
 - aria2c: a sandboxed Debug build with `--env LECTERN_ARIA2_TEST=<public https file> --stdout <file>` downloads it with aria2c, then URLSession only, and prints both durations.
+- A Debug build has the same bundle id as the installed app, so it shares the owner's defaults and Keychain item. To click through the UI (Settings, menus), build with `PRODUCT_BUNDLE_IDENTIFIER=com.danihrndzld.lecternaudio.smoke`, point `LECTERN_LIBRARY` at a copy, and run `defaults delete com.danihrndzld.lecternaudio.smoke` afterwards. `screencapture` has no Screen Recording permission here; read window titles and sizes with System Events (`osascript`) instead.
 - Always launch test builds with `open -g` so they don't take the owner's focus, and check `ls -t ~/Library/Logs/DiagnosticReports | head` after each launch so crash dialogs aren't left for the owner. Quit the processes you start.
 - The owner's OpenAudible folder is on an external USB disk (`/Volumes/Mac`). An ad-hoc signed test build opening it blocks in `open()` on the removable-volume consent prompt until someone answers it (one stray build sat there for an hour). Copy `books.json` and `art/` to a local folder and point `LECTERN_LIBRARY` at the copy.
 
@@ -93,4 +96,4 @@ open -g -n -W --stdout /tmp/perf-release.txt --env LECTERN_HARNESS=1 --env LECTE
 
 ## Workflow
 
-Agents work in their own git worktree (`git worktree add ../Lectern-<topic> -b <branch> origin/main`) and never edit, stash, reset or build in the owner's main checkout. Issues labeled `agent` are implemented by `.github/workflows/claude.yml` (only the repo owner's label or comment triggers it). CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green on the exact head commit. Add the label `hold` to a PR to stop the merge. PRs that change files under `.github/` are never automerged; merge them by hand. Nobody reviews code, so the tests are the review. Issues labeled `feature-request` or `future` wait until the owner adds `agent`.
+Commits and PRs use `Daniel Hernández <danisnowman@gmail.com>` and carry no `Co-Authored-By: Claude` or "Generated with Claude Code" lines (they were removed from history once with git filter-repo). Agents work in their own git worktree (`git worktree add ../Lectern-<topic> -b <branch> origin/main`) and never edit, stash, reset or build in the owner's main checkout. Issues labeled `agent` are implemented by `.github/workflows/claude.yml` (only the repo owner's label or comment triggers it). CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green on the exact head commit. Add the label `hold` to a PR to stop the merge. PRs that change files under `.github/` are never automerged; merge them by hand. Nobody reviews code, so the tests are the review. Issues labeled `feature-request` or `future` wait until the owner adds `agent`.
