@@ -12,54 +12,12 @@ struct LibraryTable: View {
     @Environment(LibraryModel.self) private var model
     @Environment(Player.self) private var player
     @AppStorage(Prefs.tableFontSize) private var fontSize = TableFontSize.medium
-    @FocusState private var focused: Bool
 
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("LibraryTable")
-        #endif
-        @Bindable var model = model
-        Table(model.visibleBooks, selection: $model.selection, sortOrder: $model.sortOrder, columnCustomization: $model.columnCustomization) {
-            TableColumn("Title", sortUsing: BookComparator(.title)) { b in
-                HStack(spacing: 8) {
-                    Cover(url: model.artURL(for: b), thumbnail: true).frame(width: 28, height: 28)
-                    Text(b.title).lineLimit(1)
-                }
-            }
-            .width(min: 200, ideal: 320)
-            .customizationID(BookColumn.title.rawValue)
-            .disabledCustomizationBehavior(.visibility)
-            TableColumn("Author", sortUsing: BookComparator(.author)) { Text($0.author) }
-                .width(min: 100, ideal: 160).customizationID(BookColumn.author.rawValue)
-            TableColumn("Narrator", sortUsing: BookComparator(.narrator)) { Text($0.narratedBy) }
-                .width(min: 100, ideal: 140).customizationID(BookColumn.narrator.rawValue)
-            TableColumn("Length", sortUsing: BookComparator(.length)) { Text($0.durationText).monospacedDigit() }
-                .width(70).customizationID(BookColumn.length.rawValue)
-            TableColumn("Purchased", sortUsing: BookComparator(.purchased)) { b in
-                Text(b.purchaseDate?.formatted(date: .abbreviated, time: .omitted) ?? "—")
-            }.width(100).customizationID(BookColumn.purchased.rawValue)
-            TableColumn("Released", sortUsing: BookComparator(.released)) { b in
-                Text(b.releaseDate?.formatted(.dateTime.year()) ?? "—")
-            }.width(60).customizationID(BookColumn.released.rawValue)
-            TableColumn("Rating", sortUsing: BookComparator(.rating)) { b in
-                Text(b.rating.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "—").monospacedDigit()
-            }.width(50).customizationID(BookColumn.rating.rawValue)
-            TableColumn("Genre", sortUsing: BookComparator(.genre)) { Text($0.primaryGenre) }
-                .width(min: 100, ideal: 150).customizationID(BookColumn.genre.rawValue)
-            TableColumn("") { b in StatusBadge(book: b) }.width(24).customizationID("status")
-        }
-        .font(fontSize.font)
-        .focused($focused)
-        .onChange(of: model.focusListRequest) { focused = true }
-        .contextMenu(forSelectionType: Book.ID.self) { ids in
-            if let id = ids.first, let b = model.books.first(where: { $0.id == id }) { BookActions(book: b, model: model, player: player) }
-        } primaryAction: { ids in
-            if let id = ids.first, let b = model.books.first(where: { $0.id == id }) { play(b) }
-        }
-    }
-
-    private func play(_ b: Book) {
-        if let url = model.audioURL(for: b) { player.play(b, url: url) }
+        // Every model property the table shows is read here, so this body (and the table's update) re-runs when one changes.
+        BookTable(model: model, player: player, books: model.visibleBooks, selection: model.selection, sortOrder: model.sortOrder,
+                  columns: model.columnCustomization, fontSize: fontSize, focusRequest: model.focusListRequest)
     }
 }
 
@@ -68,9 +26,7 @@ struct LibraryGrid: View {
     @Environment(Player.self) private var player
 
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("LibraryGrid")
-        #endif
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20)], spacing: 24) {
                 ForEach(model.visibleBooks) { b in
@@ -106,20 +62,10 @@ struct Cover: View {
     var thumbnail = false
     @State private var loaded: (url: URL, image: CGImage)?
 
-    /// ~19 MB for every thumbnail of a 500-book library; large covers are evicted first by cost.
-    private static let cache = {
-        let cache = NSCache<NSString, CGImage>()
-        cache.totalCostLimit = 128 << 20
-        return cache
-    }()
-
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("Cover")
-        #endif
-        let pixels = thumbnail ? 96 : 512
-        let key = url.map { "\(pixels) \($0.absoluteString)" as NSString }
-        let image = key.flatMap { Self.cache.object(forKey: $0) } ?? loaded.flatMap { $0.url == url ? $0.image : nil }
+        let pixels = thumbnail ? CoverCache.thumbnailPixels : 512
+        let image = url.flatMap { CoverCache.cached($0, pixels: pixels) } ?? loaded.flatMap { $0.url == url ? $0.image : nil }
         ZStack {
             if let image {
                 Image(decorative: image, scale: 1).resizable().scaledToFill()
@@ -131,14 +77,30 @@ struct Cover: View {
         .clipShape(RoundedRectangle(cornerRadius: thumbnail ? 4 : 8))
         .shadow(color: .black.opacity(thumbnail ? 0 : 0.18), radius: thumbnail ? 0 : 6, y: thumbnail ? 0 : 3)
         .task(id: url) {
-            guard let url, let key, image == nil, let decoded = await Self.downsample(url, pixels: pixels) else { return }
-            Self.cache.setObject(decoded, forKey: key, cost: decoded.bytesPerRow * decoded.height)
+            guard let url, image == nil, let decoded = await CoverCache.load(url, pixels: pixels) else { return }
             loaded = (url, decoded)
         }
     }
+}
 
-    /// ImageIO thumbnail no larger than `pixels` on its long side (WWDC18 "Image and Graphics Best Practices").
-    @concurrent nonisolated private static func downsample(_ url: URL, pixels: Int) async -> CGImage? {
+/// ImageIO thumbnails shared by `Cover` and the table cells.
+nonisolated enum CoverCache {
+    static let thumbnailPixels = 96
+
+    /// ~19 MB for every thumbnail of a 500-book library; large covers are evicted first by cost.
+    nonisolated(unsafe) private static let cache = {  // NSCache is thread-safe (documented); it's read on main and written off main
+        let cache = NSCache<NSString, CGImage>()
+        cache.totalCostLimit = 128 << 20
+        return cache
+    }()
+
+    private static func key(_ url: URL, pixels: Int) -> NSString { "\(pixels) \(url.absoluteString)" as NSString }
+
+    static func cached(_ url: URL, pixels: Int) -> CGImage? { cache.object(forKey: key(url, pixels: pixels)) }
+
+    /// ImageIO thumbnail no larger than `pixels` on its long side (WWDC18 "Image and Graphics Best Practices"), cached.
+    @concurrent static func load(_ url: URL, pixels: Int) async -> CGImage? {
+        if let image = cached(url, pixels: pixels) { return image }
         let source: CGImageSource?
         if url.isFileURL {
             source = CGImageSourceCreateWithURL(url as CFURL, nil)
@@ -146,13 +108,14 @@ struct Cover: View {
             guard let data = try? await URLSession.shared.data(from: url).0 else { return nil }
             source = CGImageSourceCreateWithData(data as CFData, nil)
         }
-        guard let source else { return nil }
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+        guard let source, let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: pixels,
-        ] as CFDictionary)
+        ] as CFDictionary) else { return nil }
+        cache.setObject(image, forKey: key(url, pixels: pixels), cost: image.bytesPerRow * image.height)
+        return image
     }
 }
 

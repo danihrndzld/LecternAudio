@@ -16,10 +16,10 @@ The Time Profiler trace showed several causes in app code, and they added up to 
 
 The fix moved filtering, sorting, sidebar counts and genres into `LibraryIndex` in AudibleCore, which recomputes only when its inputs change. Covers now use an ImageIO thumbnail decoded off the main thread at display size, kept in an `NSCache`. App code now costs about 11 ms per switch, the list takes 101 to 117 ms and the grid 45 to 52 ms.
 
-The rest of the cost is inside SwiftUI `Table`. Row diffing takes 39 to 51 ms, row height measurement 28 to 38 ms, and teardown of old row views about 25 ms. App code can't remove that, so a faster list needs an `NSTableView` behind `NSViewRepresentable`.
+The rest of the cost was inside SwiftUI `Table`, and this entry's "101 to 117 ms" understated it badly: the harness lost the span whenever the table update ran inside a nested run loop, and the one transition it measured (Finished → All Books on the merged library) happened to be a cheap one. The next entry has the real numbers (3 to 9 s) and the `NSTableView` that replaced the `Table`.
 
 What did not help:
-- Recreating the table with `.id(model.filter)` made a switch take 371 ms.
+- Recreating the table with `.id(model.filter)` (371 ms then; 243 to 360 ms per switch when remeasured in PR #43).
 - Turning off table animations and removing tooltips changed nothing.
 - Date formatting, image decoding and the player's once a second time update never showed up on the main thread.
 
@@ -27,6 +27,23 @@ How to avoid a repeat:
 - Measure with the real library size, not a three book fixture. The cost scales with the number of rows and with the window height.
 - Use the `LECTERN_PERF_CYCLE` harness from `CLAUDE.md` before and after a change, run baseline and fix alternately, and note the machine load, because other builds running at the same time added noise of up to 30%.
 - Count body evaluations with `BodyCount.tick`, because the SwiftUI Instruments template recorded no view updates in this setup.
+
+### In Audible Only → All Books froze the window for 5 s (PR #43)
+
+The owner reported the freeze with the Release build of PR #41 installed, signed out, with only the OpenAudible folder open (518 books, 144 of them without local files). PR #41 had measured Finished → All Books at 110 to 150 ms and did not see it.
+
+Reproduced with the owner's `books.json` and `art/` in an optimized build (`sample` call trees and an xctrace Time Profiler trace agree):
+- Finished → All Books 9.1 s, History → All Books 8.2 s (8.0 s on the merged library), In Audible Only → All Books 3.2 s. Downloaded → All Books 71 ms, Not Converted → All Books 157 ms. The reverse switches took 160 to 195 ms.
+- All of it was inside `AppKitOutlineTableCoordinator.update(…diffRows…)` → `-[NSTableView endUpdates]` → `_doAutomaticRowHeightsForInsertedAndVisibleRows`: SwiftUI `Table` diffs the old and new rows and inserts the new ones, and AppKit, to keep the top visible row stable, builds a full hosted row view (`NSHostingView`, Auto Layout, the `Cover` view) for every inserted row above it to measure its automatic height, then tears each one down (`_removeViewAndAddToReuse` → `removeFromSuperview`). About 17 ms per row; 509 rows for Finished → All Books. The cost depends on how many of the new rows sort above the old top row, which is why Downloaded → All Books (whose top row is the newest purchase) was fast and why PR #41's merged-library Finished list (93 Audible-marked books, newest first) hid the problem.
+- The old harness recorded "busy" from run-loop wake to sleep with one `since` variable; the nested run loop inside the table update reset it, so several 9 s freezes were recorded as 0 ms and the 1 s window cut off the rest.
+
+Fix: `BookTable`, an `NSTableView` behind `NSViewRepresentable` with `usesAutomaticRowHeights = false`, cells updated in place (`noteNumberOfRowsChanged` plus reconfiguring the available row views; `reloadData()` freed and rebuilt all 225 visible cells for 150 ms), cells laid out by hand outside Auto Layout and drawn into one layer per row. Sorting by header click, multiple selection, double-click to play, the context menu (`NSHostingMenu` over `BookActions`), the header menu and View ▸ Table Settings for columns, column autosave, the font size preference and View ▸ Focus Book List are kept. After: every list transition, sort flip and search change settles in 34 to 83 ms of main-thread work; the grid (`LazyVGrid`) was already 44 to 113 ms and is unchanged.
+
+Lessons:
+- Measure the transitions the owner actually performs, with the owner's data, in the build configuration the owner runs. One convenient transition on a different data set reported 150 ms for a 9 s freeze.
+- A recorder can be the blind spot. Check that the harness sees a deliberately slow case (sleep 1 s on the main thread) before trusting its zeros, and record wall clock from a background thread.
+- When a `sample` call tree shows `_doAutomaticRowHeightsForInsertedAndVisibleRows` or hundreds of hosted views created and destroyed per update, the fix is a fixed-height AppKit table, not a tweak to the SwiftUI one.
+- An ad-hoc signed test build reading the owner's external disk (`/Volumes/Mac`) blocks in `open()` on the removable-volume consent prompt; a stray build from PR #41 sat there for an hour. Use a local copy of `books.json` and `art/`.
 
 ## Crashes
 
