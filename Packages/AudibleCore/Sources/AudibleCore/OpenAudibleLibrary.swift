@@ -44,13 +44,6 @@ public struct OpenAudibleLibrary: Sendable {
         book.files.first { $0.type == .art }.flatMap(url(for:)) ?? book.imageURL
     }
 
-    /// Small cover if OpenAudible generated one (often it hasn't), else the full art.
-    public func thumbURL(for book: Book) -> URL? {
-        guard let art = artURL(for: book), art.isFileURL else { return artURL(for: book) }
-        let thumb = root.appendingPathComponent("thumb").appendingPathComponent(art.lastPathComponent)
-        return FileManager.default.fileExists(atPath: thumb.path) ? thumb : art
-    }
-
     public func pdfURL(for book: Book) -> URL? {
         book.files.first { $0.type == .pdf }.flatMap(url(for:))
     }

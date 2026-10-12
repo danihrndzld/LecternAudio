@@ -109,11 +109,9 @@ enum BodyCount {
     }
     CFRunLoopAddObserver(CFRunLoopGetMain(), wake, .commonModes)
     CFRunLoopAddObserver(CFRunLoopGetMain(), idle, .commonModes)
-    // Keep the window visible and the app out of App Nap: an occluded window skips drawing and napping delays timers.
+    // Keep the app out of App Nap even when launched in the background (`open -g`): napping delays the timers.
     let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "perf cycle")
     defer { ProcessInfo.processInfo.endActivity(activity) }
-    NSApp.windows.first?.level = .floating
-    NSApp.windows.first?.orderFrontRegardless()
     NSApp.windows.first?.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
     try? await Task.sleep(for: .seconds(3))
     let signposter = OSSignposter(subsystem: "com.danihrndzld.lecternaudio", category: .pointsOfInterest)

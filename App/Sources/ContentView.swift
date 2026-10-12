@@ -38,8 +38,7 @@ struct ContentView: View {
                 .frame(maxHeight: .infinity)
                 if player.book != nil { PlayerBar() }
             }
-            .navigationTitle(model.filter.title)
-            .navigationSubtitle(model.books.isEmpty ? "" : "\(model.visibleBooks.count) books")
+            .modifier(LibraryTitle(model: model))
         }
         .inspector(isPresented: $model.showInspector) {
             Group {
@@ -127,6 +126,18 @@ struct ContentView: View {
 
     private func applyAppearance(_ name: String) {
         NSApp.appearance = name == "system" ? nil : NSAppearance(named: name == "dark" ? .darkAqua : .aqua)
+    }
+}
+
+/// Reads the filter and visible count in its own body, so switching filters doesn't re-run ContentView's body
+/// (and rebuild the table, sidebar and toolbar) just to change the window title.
+private struct LibraryTitle: ViewModifier {
+    let model: LibraryModel
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(model.filter.title)
+            .navigationSubtitle(model.books.isEmpty ? "" : "\(model.visibleBooks.count) books")
     }
 }
 
