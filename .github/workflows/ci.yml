@@ -12,13 +12,30 @@ jobs:
     container: swift:6.1
     steps:
       - uses: actions/checkout@v4
+      # Dependencies (swift-crypto/BoringSSL) are ~95% of the compile; SwiftPM rebuilds only what changed.
+      - uses: actions/cache@v4
+        with:
+          path: Packages/AudibleCore/.build
+          key: spm-linux-swift6.1-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
+          restore-keys: spm-linux-swift6.1-
       - run: swift test --package-path Packages/AudibleCore
   macos:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      # FFmpeg and aria2c built from source. Pushes to main build both architectures so the cache, readable
+      # from every branch and tag, also serves release.yml.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            build/ffmpeg-8.0
+            build/aria2-1.37.0
+          key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
       - run: brew install xcodegen
       - run: xcodegen generate
       - run: swift test --package-path Packages/AudibleCore
-      - run: xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build CODE_SIGNING_ALLOWED=NO | tail -20
+      - run: |
+          universal=()
+          if [ "$GITHUB_EVENT_NAME" = push ]; then universal=("ARCHS=arm64 x86_64" ONLY_ACTIVE_ARCH=NO); fi
+          xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build CODE_SIGNING_ALLOWED=NO "${universal[@]}" | tail -20
         shell: bash -o pipefail {0}

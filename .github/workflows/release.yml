@@ -24,14 +24,13 @@ jobs:
       - run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag must look like v1.2.3, got $TAG"; exit 1; }
           git checkout "refs/tags/$TAG"
-      - uses: actions/cache@v4
+      # Saved by ci.yml on pushes to main (both architectures). A tag can't reuse caches saved on another tag.
+      - uses: actions/cache/restore@v4
         with:
-          path: build/ffmpeg-8.0
-          key: ffmpeg-${{ runner.os }}-${{ hashFiles('scripts/build-ffmpeg.sh') }}
-      - uses: actions/cache@v4
-        with:
-          path: build/aria2-1.37.0
-          key: aria2-${{ runner.os }}-${{ hashFiles('scripts/build-aria2.sh') }}
+          path: |
+            build/ffmpeg-8.0
+            build/aria2-1.37.0
+          key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
       - run: brew install xcodegen
       - run: xcodegen generate
       - name: Build, sign and package
