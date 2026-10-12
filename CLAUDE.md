@@ -28,11 +28,18 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
 ```
 UI changes: render a snapshot and look at it. Debug builds read these env vars:
 ```sh
-xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build CODE_SIGN_ENTITLEMENTS=   # unsandboxed debug
+xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build CODE_SIGN_ENTITLEMENTS= ENABLE_HARDENED_RUNTIME=NO   # unsandboxed debug (without the entitlements, hardened runtime refuses the ad-hoc Sparkle.framework)
 open -n -W --env LECTERN_LIBRARY=<OpenAudible folder> --env LECTERN_SELECT=<asin> --env LECTERN_SNAPSHOT=/tmp/shot.png "build/Build/Products/Debug/Lectern Audio.app"
 ```
 The sidebar renders black in snapshots (vibrancy isn't captured by `cacheDisplay`); that is expected.
 aria2c downloads: a sandboxed Debug build with `--env LECTERN_ARIA2_TEST=<public https file> --stdout <file>` downloads it with aria2c, then URLSession only, and prints both durations. aria2c output can contain the signed URL: never log it.
+
+Performance: `LECTERN_PERF_CYCLE=N` switches the sidebar Finished → All Books N times, prints main-thread ms per switch and body evaluations per view (`BodyCount.tick`), then quits; each switch is an "All Books" Points of Interest signpost for Instruments. `LECTERN_SYNCED_LIBRARY=<library.json>` merges a synced Audible list without signing in. `-viewMode YES` measures the cover grid. Measure optimized code, launched in the background so it doesn't take the owner's focus:
+```sh
+xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build/perf build CODE_SIGN_ENTITLEMENTS= ENABLE_HARDENED_RUNTIME=NO SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule PRODUCT_BUNDLE_IDENTIFIER=com.danihrndzld.lecternaudio.perf
+open -g -n -W --stdout /tmp/perf.txt --env LECTERN_LIBRARY=<OpenAudible folder> --env LECTERN_SYNCED_LIBRARY=<library.json> --env LECTERN_PERF_CYCLE=10 "build/perf/Build/Products/Debug/Lectern Audio.app" --args -viewMode NO
+```
+`xctrace record --launch` resolves the app by name and can start the installed `/Applications/Lectern Audio.app` instead; record with `--all-processes` while the app runs. Snapshots also take `open -g`.
 
 ## Workflow
 Issues labeled `agent` are implemented by `.github/workflows/claude.yml`. CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green. Add the label `hold` to a PR to stop the merge. PRs that change files under `.github/` are never automerged; merge them by hand. Nobody reviews code, so the tests are the review.

@@ -4,44 +4,17 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-enum LibraryFilter: Hashable {
-    case all, downloaded, notConverted, audibleOnly, reading, finished, pdfs
-    case genre(String)
-
-    var title: String {
-        switch self {
-        case .all: "All Books"
-        case .downloaded: "Downloaded"
-        case .notConverted: "Not Converted"
-        case .audibleOnly: "In Audible Only"
-        case .reading: "Listening"
-        case .finished: "Finished"
-        case .pdfs: "With PDF"
-        case .genre(let g): g
-        }
-    }
-
-    func matches(_ b: Book) -> Bool {
-        switch self {
-        case .all: true
-        case .downloaded: b.hasAudio
-        case .notConverted: b.hasEncrypted && !b.hasAudio
-        case .audibleOnly: !b.hasEncrypted && !b.hasAudio
-        case .reading: b.readStatus == .reading
-        case .finished: b.readStatus == .finished
-        case .pdfs: b.hasPDF
-        case .genre(let g): b.primaryGenre == g
-        }
-    }
-}
-
 @Observable
 final class LibraryModel {
     private(set) var library: OpenAudibleLibrary? { didSet { merge() } }
     /// The list from Audible, saved at ~/Library/Application Support/Lectern Audio/library.json. Empty when signed out.
     private var audibleBooks: [Book] = [] { didSet { merge() } }
     /// Audible's list with local files from the OpenAudible folder, or just the folder when not synced.
-    private(set) var books: [Book] = []
+    private(set) var books: [Book] = [] { didSet { index.books = books } }
+    /// Filtered, sorted and counted once per change of books, filter, search or sort, not on every render.
+    /// Separate from `books`, `filter`, `search` and `sortOrder` so views that read only those (the search field
+    /// binding, the inspector) don't update whenever the derived list changes.
+    private var index = LibraryIndex()
     private(set) var isSyncing = false
     private(set) var syncedCount = 0
     var syncError: String?
@@ -50,11 +23,11 @@ final class LibraryModel {
         didSet { if let accountIdentity { UserDefaults.standard.set(lastSync, forKey: "lastSync.\(accountIdentity)") } }
     }
     private(set) var error: String?
-    var filter: LibraryFilter = .all
-    var search = ""
+    var filter: LibraryFilter = .all { didSet { index.filter = filter } }
+    var search = "" { didSet { index.search = search } }
     var selection: Set<Book.ID> = []
     var isPickingFolder = false
-    var sortOrder = BookComparator.defaultOrder
+    var sortOrder = BookComparator.defaultOrder { didSet { index.sortOrder = sortOrder } }
     var columnCustomization: TableColumnCustomization<Book> = (UserDefaults.standard.data(forKey: "tableColumns"))
         .flatMap { try? JSONDecoder().decode(TableColumnCustomization<Book>.self, from: $0) } ?? .init() {
         didSet { UserDefaults.standard.set(try? JSONEncoder().encode(columnCustomization), forKey: "tableColumns") }
@@ -113,6 +86,12 @@ final class LibraryModel {
         accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Lectern Audio/accounts/\($0)") }
         downloadedLibrary = accountRoot.flatMap { try? OpenAudibleLibrary(root: $0) }
         audibleBooks = store.map { AudibleLibrary.load(from: $0) } ?? []
+        #if DEBUG
+        // LECTERN_SYNCED_LIBRARY=<library.json> loads a synced Audible list without signing in (perf runs on real data).
+        if identity == nil, let path = ProcessInfo.processInfo.environment["LECTERN_SYNCED_LIBRARY"] {
+            audibleBooks = AudibleLibrary.load(from: URL(fileURLWithPath: path))
+        }
+        #endif
         lastSync = identity.flatMap { UserDefaults.standard.object(forKey: "lastSync.\($0)") as? Date }
         downloads.configure(session: session, library: self, root: accountRoot)
         if identity == nil { conversion.cancel() }
@@ -189,30 +168,16 @@ final class LibraryModel {
 
     /// Local cover when the folder has one, else Audible's CDN image.
     func artURL(for book: Book) -> URL? { library?.artURL(for: book) ?? book.imageURL }
-    func thumbURL(for book: Book) -> URL? { library?.thumbURL(for: book) ?? book.imageURL }
 
-    var visibleBooks: [Book] {
-        let q = search.trimmingCharacters(in: .whitespaces)
-        return books.filter { b in
-            filter.matches(b) && (q.isEmpty
-                || b.title.localizedStandardContains(q)
-                || b.author.localizedStandardContains(q)
-                || b.narratedBy.localizedStandardContains(q))
-        }.sorted(using: sortOrder)
-    }
-
-    var genres: [(String, Int)] {
-        Dictionary(grouping: books.map(\.primaryGenre).filter { !$0.isEmpty }, by: { $0 })
-            .map { ($0.key, $0.value.count) }
-            .sorted { $0.0 < $1.0 }
-    }
+    var visibleBooks: [Book] { index.visible }
+    var genres: [(name: String, count: Int)] { index.genres }
 
     var selectedBook: Book? {
         guard selection.count == 1, let id = selection.first else { return nil }
         return books.first { $0.id == id }
     }
 
-    func count(_ f: LibraryFilter) -> Int { books.count(where: f.matches) }
+    func count(_ f: LibraryFilter) -> Int { index.count(f) }
 
     var totalHours: Int { books.reduce(0) { $0 + $1.seconds } / 3600 }
 

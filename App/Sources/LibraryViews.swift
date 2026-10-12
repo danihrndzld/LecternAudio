@@ -1,4 +1,5 @@
 import AudibleCore
+import ImageIO
 import SwiftUI
 
 nonisolated extension Book {
@@ -14,11 +15,14 @@ struct LibraryTable: View {
     @FocusState private var focused: Bool
 
     var body: some View {
+        #if DEBUG
+        let _ = BodyCount.tick("LibraryTable")
+        #endif
         @Bindable var model = model
         Table(model.visibleBooks, selection: $model.selection, sortOrder: $model.sortOrder, columnCustomization: $model.columnCustomization) {
             TableColumn("Title", sortUsing: BookComparator(.title)) { b in
                 HStack(spacing: 8) {
-                    Cover(url: model.thumbURL(for: b), thumbnail: true).frame(width: 28, height: 28)
+                    Cover(url: model.artURL(for: b), thumbnail: true).frame(width: 28, height: 28)
                     Text(b.title).lineLimit(1)
                 }
             }
@@ -64,6 +68,9 @@ struct LibraryGrid: View {
     @Environment(Player.self) private var player
 
     var body: some View {
+        #if DEBUG
+        let _ = BodyCount.tick("LibraryGrid")
+        #endif
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20)], spacing: 24) {
                 ForEach(model.visibleBooks) { b in
@@ -92,23 +99,60 @@ struct LibraryGrid: View {
     }
 }
 
+/// A book cover decoded at display size off the main thread and kept in memory. AsyncImage decoded the full art
+/// for every 28 pt row each time the row appeared, and cached nothing.
 struct Cover: View {
     let url: URL?
     var thumbnail = false
+    @State private var loaded: (url: URL, image: CGImage)?
+
+    /// ~19 MB for every thumbnail of a 500-book library; large covers are evicted first by cost.
+    private static let cache = {
+        let cache = NSCache<NSString, CGImage>()
+        cache.totalCostLimit = 128 << 20
+        return cache
+    }()
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFill()
+        #if DEBUG
+        let _ = BodyCount.tick("Cover")
+        #endif
+        let pixels = thumbnail ? 96 : 512
+        let key = url.map { "\(pixels) \($0.absoluteString)" as NSString }
+        let image = key.flatMap { Self.cache.object(forKey: $0) } ?? loaded.flatMap { $0.url == url ? $0.image : nil }
+        ZStack {
+            if let image {
+                Image(decorative: image, scale: 1).resizable().scaledToFill()
             } else {
-                ZStack {
-                    Rectangle().fill(.quaternary)
-                    Image(systemName: "book.closed").foregroundStyle(.secondary)
-                }
+                Rectangle().fill(.quaternary)
+                Image(systemName: "book.closed").foregroundStyle(.secondary)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: thumbnail ? 4 : 8))
-        .shadow(color: .black.opacity(thumbnail ? 0 : 0.18), radius: 6, y: 3)
+        .shadow(color: .black.opacity(thumbnail ? 0 : 0.18), radius: thumbnail ? 0 : 6, y: thumbnail ? 0 : 3)
+        .task(id: url) {
+            guard let url, let key, image == nil, let decoded = await Self.downsample(url, pixels: pixels) else { return }
+            Self.cache.setObject(decoded, forKey: key, cost: decoded.bytesPerRow * decoded.height)
+            loaded = (url, decoded)
+        }
+    }
+
+    /// ImageIO thumbnail no larger than `pixels` on its long side (WWDC18 "Image and Graphics Best Practices").
+    @concurrent nonisolated private static func downsample(_ url: URL, pixels: Int) async -> CGImage? {
+        let source: CGImageSource?
+        if url.isFileURL {
+            source = CGImageSourceCreateWithURL(url as CFURL, nil)
+        } else {
+            guard let data = try? await URLSession.shared.data(from: url).0 else { return nil }
+            source = CGImageSourceCreateWithData(data as CFData, nil)
+        }
+        guard let source else { return nil }
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: pixels,
+        ] as CFDictionary)
     }
 }
 

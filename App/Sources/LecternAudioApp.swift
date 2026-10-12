@@ -1,4 +1,5 @@
 import AudibleCore
+import os
 import Sparkle
 import SwiftUI
 
@@ -29,6 +30,7 @@ struct LecternAudioApp: App {
                     }
                     await debugSnapshot()
                     await debugAria2()
+                    await debugPerfCycle(library)
                 }
                 #endif
         }
@@ -84,6 +86,57 @@ struct LecternAudioApp: App {
         print("aria2-test", accelerator == nil ? "urlsession" : "aria2c", ContinuousClock.now - start, outcome)
     }
     print("aria2-test log", AppLog.shared.lines)
+    NSApp.terminate(nil)
+}
+
+/// Body evaluations per view during a perf cycle: `let _ = BodyCount.tick("Name")` at the top of a body.
+enum BodyCount {
+    static var counts: [String: Int] = [:]
+    static func tick(_ name: String) { counts[name, default: 0] += 1 }
+}
+
+/// `LECTERN_PERF_CYCLE=N` switches the sidebar filter Finished → All Books N times, prints how long the main thread
+/// stays busy after each switch, and quits. Each switch is an os_signpost interval ("All Books", Points of Interest).
+/// first = switch until the run loop first goes idle; busy = all main-thread work in the next second; longest = worst span.
+@MainActor private func debugPerfCycle(_ library: LibraryModel) async {
+    guard let n = ProcessInfo.processInfo.environment["LECTERN_PERF_CYCLE"].flatMap(Int.init), n > 0 else { return }
+    final class Spans { var since: ContinuousClock.Instant?; var all: [Duration] = [] }
+    let spans = Spans()
+    let wake = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.afterWaiting.rawValue, true, .min) { _, _ in spans.since = .now }
+    let idle = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.beforeWaiting.rawValue, true, .max) { _, _ in
+        if let since = spans.since { spans.all.append(.now - since) }
+        spans.since = nil
+    }
+    CFRunLoopAddObserver(CFRunLoopGetMain(), wake, .commonModes)
+    CFRunLoopAddObserver(CFRunLoopGetMain(), idle, .commonModes)
+    // Keep the app out of App Nap even when launched in the background (`open -g`): napping delays the timers.
+    let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "perf cycle")
+    defer { ProcessInfo.processInfo.endActivity(activity) }
+    NSApp.windows.first?.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
+    try? await Task.sleep(for: .seconds(3))
+    let signposter = OSSignposter(subsystem: "com.danihrndzld.lecternaudio", category: .pointsOfInterest)
+    func ms(_ d: Duration) -> Int { Int(d / .milliseconds(1)) }
+    var firsts: [Int] = [], busies: [Int] = [], longests: [Int] = [], bodies: [String: [Int]] = [:]
+    for _ in 0..<n {
+        library.filter = .finished
+        try? await Task.sleep(for: .milliseconds(800))
+        let state = signposter.beginInterval("All Books")
+        spans.all = []
+        spans.since = .now
+        BodyCount.counts = [:]
+        library.filter = .all
+        try? await Task.sleep(for: .seconds(1))
+        signposter.endInterval("All Books", state)
+        firsts.append(ms(spans.all.first ?? .zero))
+        busies.append(ms(spans.all.reduce(.zero, +)))
+        longests.append(ms(spans.all.max() ?? .zero))
+        for (name, count) in BodyCount.counts { bodies[name, default: []].append(count) }
+    }
+    func median(_ xs: [Int]) -> Int { xs.sorted()[xs.count / 2] }
+    print("perf: Finished → All Books x\(n), \(library.books.count) books, median ms: first \(median(firsts)), busy \(median(busies)), longest \(median(longests))")
+    print("perf: body evaluations per switch (median):", bodies.sorted { $0.key < $1.key }.map { "\($0.key) \(median($0.value))" }.joined(separator: ", "))
+    print("perf: first \(firsts)\nperf: busy \(busies)\nperf: longest \(longests)")
+    fflush(stdout)
     NSApp.terminate(nil)
 }
 #endif
