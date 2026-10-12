@@ -46,6 +46,14 @@ struct BookDetail: View {
                         .disabled(model.conversion.isRunning)
                 }
 
+                if !model.isSignedIn && !book.hasAudio {
+                    // Downloads need the synced Audible list; without a session the button would just be missing.
+                    SettingsLink {
+                        Label("Sign In to Audible to Download", systemImage: "person.crop.circle").frame(maxWidth: .infinity)
+                    }
+                    Text("Settings, Account").font(.caption).foregroundStyle(.secondary)
+                }
+
                 if model.canDownload(book) {
                     Button("Download and Convert", systemImage: "arrow.down.circle") { model.downloads.enqueue([book]) }
                         .disabled(model.downloads.jobs.contains { $0.id == book.id && [.queued, .licensing, .downloading, .converting].contains($0.state) })
