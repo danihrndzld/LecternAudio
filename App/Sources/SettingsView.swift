@@ -21,12 +21,18 @@ enum Prefs {
     static let playerApp = "playerApp"
     static let browserApp = "browserApp"
     static let fileManagerApp = "fileManagerApp"
+    static let aria2 = "aria2"
+    static let aria2Connections = "aria2Connections"
+    static let aria2Split = "aria2Split"
+    static let aria2MinSplitMiB = "aria2MinSplitMiB"
+    static let aria2MaxSpeedMBps = "aria2MaxSpeedMBps"  // 0 = unlimited
 
     /// Defaults for non-view readers; the `@AppStorage` declarations below repeat the same values.
     static func register() {
         UserDefaults.standard.register(defaults: [
             outputFormat: "m4b", mp3Bitrate: 320, oggQuality: 10, refreshOnLaunch: true, autoSync: true, autoSyncHours: 24,
             appearance: "system", tableFontSize: "medium",
+            aria2Connections: 16, aria2Split: 16, aria2MinSplitMiB: 1, aria2MaxSpeedMBps: 0,
         ])
     }
 
@@ -42,6 +48,33 @@ enum Prefs {
         var options = OggExport.Options()
         options.quality = min(max(UserDefaults.standard.integer(forKey: oggQuality), 0), 10)
         return options
+    }
+
+    /// The bundled aria2c as the download transport, or nil when it is off or missing. A failure is logged with the
+    /// host only (the query string is the signature) and `ContentDownload` falls back to URLSession.
+    static var aria2Accelerator: ContentDownload.Accelerator? {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: aria2), AppInfo.aria2Bundled else { return nil }
+        let helper = Bundle.main.bundleURL.appending(path: "Contents/Helpers/aria2c")
+        var options = Aria2.Options()
+        options.connections = defaults.integer(forKey: aria2Connections)
+        options.split = defaults.integer(forKey: aria2Split)
+        options.minSplitMiB = defaults.integer(forKey: aria2MinSplitMiB)
+        options.maxSpeedMBps = defaults.integer(forKey: aria2MaxSpeedMBps)
+        // URLSession's default User-Agent starts with the same "<escaped app name>/<build>".
+        let name = (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "LecternAudio")
+            .addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "LecternAudio"
+        options.userAgent = "\(name)/\(AppInfo.build)"
+        return { [options] url, file, progress in
+            do { try await Aria2.download(executable: helper, url: url, to: file, options: options, progress: progress) }
+            catch {
+                if !(error is CancellationError) {
+                    let status = (error as? Aria2.Failure)?.status ?? -1
+                    await AppLog.shared.error("aria2c failed (status \(status)) downloading from \(url.host ?? "unknown host"); retrying with the built-in downloader.")
+                }
+                throw error
+            }
+        }
     }
 
     static func playCompletionSound() {
@@ -175,6 +208,11 @@ private struct GeneralSettings: View {
 
 private struct AdvancedSettings: View {
     @AppStorage(Prefs.externalPlayer) private var externalPlayer = false
+    @AppStorage(Prefs.aria2) private var aria2 = false
+    @AppStorage(Prefs.aria2Connections) private var connections = 16
+    @AppStorage(Prefs.aria2Split) private var split = 16
+    @AppStorage(Prefs.aria2MinSplitMiB) private var minSplit = 1
+    @AppStorage(Prefs.aria2MaxSpeedMBps) private var maxSpeed = 0
 
     var body: some View {
         Form {
@@ -183,6 +221,20 @@ private struct AdvancedSettings: View {
                 AppPicker(title: "Audio player", key: Prefs.playerApp)
                 AppPicker(title: "Web browser", key: Prefs.browserApp)
                 AppPicker(title: "File manager", key: Prefs.fileManagerApp)
+            }
+            Section("Downloads") {
+                Toggle("Use aria2c for faster downloads", isOn: $aria2).disabled(!AppInfo.aria2Bundled)
+                Group {
+                    Stepper("Connections per server: \(connections)", value: $connections, in: 1...16)
+                    Stepper("Split into \(split) parts", value: $split, in: 1...16)
+                    Picker("Minimum part size", selection: $minSplit) {
+                        ForEach([1, 4, 8, 16], id: \.self) { Text("\($0) MB").tag($0) }
+                    }
+                    TextField("Speed limit (MB/s)", value: $maxSpeed, format: .number)
+                }
+                .disabled(!aria2)
+                Text("Downloads several parts at once with the bundled aria2c. A speed limit of 0 means no limit. If aria2c fails, the built-in downloader takes over.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

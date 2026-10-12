@@ -14,8 +14,10 @@ enum AppInfo {
     /// "0.1.0 (1) [arm64]"
     static var versionLine: String { "\(version) (\(build)) [\(arch)]" }
     static var system: String { "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)" }
-    static var ffmpegBundled: Bool {
-        Bundle.main.bundleURL.appending(path: "Contents/Helpers/ffmpeg").path.withCString { access($0, X_OK) == 0 }
+    static var ffmpegBundled: Bool { helperBundled("ffmpeg") }
+    static var aria2Bundled: Bool { helperBundled("aria2c") }
+    static func helperBundled(_ name: String) -> Bool {
+        Bundle.main.bundleURL.appending(path: "Contents/Helpers/\(name)").path.withCString { access($0, X_OK) == 0 }
     }
 
     /// Prefilled GitHub issue with app and OS versions only; no account or library data.
@@ -65,6 +67,7 @@ struct AboutView: View {
                 Text("libogg 1.3.6 — BSD")
                 Text("libvorbis 1.3.7 — BSD")
                 if AppInfo.ffmpegBundled { Text("FFmpeg — GNU LGPL v2.1") }
+                if AppInfo.aria2Bundled { Text("aria2 — GNU GPL v2 or later") }
                 Text("swift-crypto — Apache License 2.0")
             }
             .font(.caption).foregroundStyle(.secondary)

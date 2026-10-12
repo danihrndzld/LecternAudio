@@ -50,7 +50,7 @@ If you used the app when it was called Earmark, macOS treats Lectern Audio as a 
 
 You need macOS 26 or later to run Lectern Audio. To build it, you need Xcode 26 or later and XcodeGen, which you can install with Homebrew.
 
-The first build downloads the FFmpeg 8.0 source code, checks its checksum, and builds a small FFmpeg helper that the app uses for conversion. Later builds reuse the cached helper, so you don't need to install FFmpeg yourself.
+The first build downloads the FFmpeg 8.0 source code, checks its checksum, and builds a small FFmpeg helper that the app uses for conversion. Later builds reuse the cached helper, so you don't need to install FFmpeg yourself. It does the same for aria2 1.37.0, an optional faster downloader (Settings › Advanced › Downloads).
 
 ## Build and run
 
@@ -84,6 +84,7 @@ The code is split into a Swift package and an app target, so the core logic can 
 - `App/Sources` holds the SwiftUI app, including the windows, the player, the settings, and the download queue.
 - `docs` holds the feature inventory of OpenAudible, the design decision record, and the conversion notes.
 - `scripts/build-ffmpeg.sh` builds the bundled FFmpeg helper.
+- `scripts/build-aria2.sh` builds the bundled aria2c helper (HTTPS through macOS, no other libraries).
 
 ## Tests
 
@@ -126,5 +127,6 @@ Lectern Audio bundles third party code under the licenses listed below.
 - LAME 3.100 for MP3 encoding, under the LGPL.
 - libogg 1.3.6 and libvorbis 1.3.7 for Ogg Vorbis encoding, under the BSD 3 clause license.
 - FFmpeg 8.0 for conversion, under the LGPL 2.1. The app includes the license, the matching source archive, and the build script.
+- aria2 1.37.0 for optional parallel downloads, under the GPL 2 or later with the OpenSSL exception. It ships as a separate helper program; the app includes the license, the matching source archive, and the build script.
 - swift-crypto for SHA-256 and RSA, under the Apache License 2.0.
 - Sparkle 2.10.0 for updates, under the MIT License.

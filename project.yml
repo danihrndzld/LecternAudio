@@ -28,6 +28,9 @@ targets:
       - name: Build and embed FFmpeg
         script: /bin/bash "$SRCROOT/scripts/build-ffmpeg.sh"
         basedOnDependencyAnalysis: false
+      - name: Build and embed aria2c
+        script: /bin/bash "$SRCROOT/scripts/build-aria2.sh"
+        basedOnDependencyAnalysis: false
     info:
       path: App/Info.plist
       properties:

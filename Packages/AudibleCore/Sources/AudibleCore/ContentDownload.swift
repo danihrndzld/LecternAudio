@@ -6,6 +6,8 @@ import FoundationNetworking
 
 public enum ContentDownload {
     public typealias Transfer = @Sendable (URLRequest) async throws -> (URL, URLResponse)
+    /// Downloads the whole URL into the file, e.g. `Aria2.download`. Any failure except cancellation falls back to `Transfer`.
+    public typealias Accelerator = @Sendable (URL, URL, @escaping @Sendable (Double?) -> Void) async throws -> Void
 
     public static func sourceName(asin: String, credentials: ContentCredentials) throws -> String {
         guard AudibleContent.validASIN(asin) else { throw AudibleError("Invalid Audible book identifier.") }
@@ -14,18 +16,36 @@ public enum ContentDownload {
         return "\(asin)-\(fingerprint).\(credentials.fileExtension)"
     }
 
-    public static func fetch(url: URL, destination: URL, transfer: Transfer,
-                             progress: @Sendable (Double?) -> Void = { _ in }) async throws -> URL {
+    public static func fetch(url: URL, destination: URL, transfer: Transfer, accelerator: Accelerator? = nil,
+                             progress: @escaping @Sendable (Double?) -> Void = { _ in }) async throws -> URL {
         guard AudibleContent.validDownloadURL(url), destination.isFileURL else {
             throw AudibleError("Invalid audiobook download location.")
         }
         let manager = FileManager.default
         if manager.fileExists(atPath: destination.path) { return destination }
         try manager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let partial = destination.appendingPathExtension("partial")
+        var partial = destination.appendingPathExtension("partial")
+        let parallel = destination.appendingPathExtension("aria2part")
+        var accelerated = false
+        if let accelerator {
+            do {
+                try await accelerator(url, parallel, progress)
+                accelerated = true
+                try? manager.removeItem(at: partial)
+                partial = parallel
+            } catch {
+                try Task.checkCancellation()
+                if error is CancellationError { throw error }
+            }
+        }
+        if !accelerated {
+            // aria2 writes segments at their own offsets, so its file has holes: never resume it sequentially.
+            try? manager.removeItem(at: parallel)
+            try? manager.removeItem(at: parallel.appendingPathExtension("aria2"))
+        }
         let initial = (try? partial.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
         var offset = initial
-        while true {
+        while !accelerated {
             try Task.checkCancellation()
             var request = URLRequest(url: url)
             request.timeoutInterval = 120

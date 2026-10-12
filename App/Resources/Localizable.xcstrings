@@ -2,6 +2,16 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "%lld MB": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld MB"
+          }
+        }
+      }
+    },
     "%lld kbps": {
       "localizations": {
         "es": {
@@ -102,6 +112,16 @@
         }
       }
     },
+    "Connections per server: %lld": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conexiones por servidor: %lld"
+          }
+        }
+      }
+    },
     "Dark": {
       "localizations": {
         "es": {
@@ -128,6 +148,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Los libros descargados también reciben una copia MP3 junto al M4B."
+          }
+        }
+      }
+    },
+    "Downloads": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descargas"
+          }
+        }
+      }
+    },
+    "Downloads several parts at once with the bundled aria2c. A speed limit of 0 means no limit. If aria2c fails, the built-in downloader takes over.": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descarga varias partes a la vez con el aria2c incluido. Un límite de 0 significa sin límite. Si aria2c falla, sigue el descargador integrado."
           }
         }
       }
@@ -232,6 +272,16 @@
         }
       }
     },
+    "Minimum part size": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamaño mínimo de parte"
+          }
+        }
+      }
+    },
     "Play a sound when a download, conversion or export finishes": {
       "localizations": {
         "es": {
@@ -292,6 +342,26 @@
         }
       }
     },
+    "Speed limit (MB/s)": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Límite de velocidad (MB/s)"
+          }
+        }
+      }
+    },
+    "Split into %lld parts": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dividir en %lld partes"
+          }
+        }
+      }
+    },
     "Sync with Audible every %lld hours": {
       "localizations": {
         "es": {
@@ -332,6 +402,16 @@
         }
       }
     },
+    "Use aria2c for faster downloads": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar aria2c para descargas más rápidas"
+          }
+        }
+      }
+    },
     "Used by Export MP3 and MP3 copies. 64 kbps and below are mono.": {
       "localizations": {
         "es": {
@@ -358,6 +438,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Navegador web"
+          }
+        }
+      }
+    },
+    "aria2 — GNU GPL v2 or later": {
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aria2 — GNU GPL v2 o posterior"
           }
         }
       }

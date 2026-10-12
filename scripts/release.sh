@@ -35,6 +35,7 @@ sign "$sparkle/Versions/B/Autoupdate"
 sign "$sparkle/Versions/B/Updater.app"
 sign "$sparkle"
 sign --entitlements App/FFmpeg.entitlements "$app/Contents/Helpers/ffmpeg"
+sign --entitlements App/Aria2.entitlements "$app/Contents/Helpers/aria2c"
 sign --entitlements "$entitlements" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
