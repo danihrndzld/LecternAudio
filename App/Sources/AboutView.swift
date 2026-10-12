@@ -3,7 +3,7 @@ import AudibleCore
 import SwiftUI
 
 enum AppInfo {
-    static let repo = URL(string: "https://github.com/danihrndzld/Earmark")!
+    static let repo = URL(string: "https://github.com/danihrndzld/LecternAudio")!
     static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     static let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
     #if arch(arm64)
@@ -23,7 +23,7 @@ enum AppInfo {
         var c = URLComponents(url: repo.appending(path: "issues/new"), resolvingAgainstBaseURL: false)!
         c.queryItems = [
             URLQueryItem(name: "title", value: "Bug: "),
-            URLQueryItem(name: "body", value: "**What happened**\n\n\n**Steps to reproduce**\n1. \n\n**Expected**\n\n\n---\nEarmark \(versionLine)\n\(system)\n"),
+            URLQueryItem(name: "body", value: "**What happened**\n\n\n**Steps to reproduce**\n1. \n\n**Expected**\n\n\n---\nLectern Audio \(versionLine)\n\(system)\n"),
         ]
         return c.url!
     }
@@ -51,9 +51,9 @@ struct AboutView: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 96, height: 96)
-            Text("Earmark").font(.title.bold())
+            Text("Lectern Audio").font(.title.bold())
             Text(AppInfo.versionLine).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
-            Link("github.com/danihrndzld/Earmark", destination: AppInfo.repo).font(.callout)
+            Link("github.com/danihrndzld/LecternAudio", destination: AppInfo.repo).font(.callout)
             if let account = session.account {
                 Text("Signed in as \(account.customerName.isEmpty ? "an Audible account" : account.customerName)")
                     .font(.callout)
@@ -81,7 +81,7 @@ struct DiagnosticsView: View {
     private var report: String {
         let b = library.books
         return """
-        Earmark \(AppInfo.versionLine)
+        Lectern Audio \(AppInfo.versionLine)
         \(AppInfo.system)
         FFmpeg bundled: \(AppInfo.ffmpegBundled ? "yes" : "no")
         Library folder: \(library.library == nil ? "none" : "open")

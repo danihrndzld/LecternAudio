@@ -6,8 +6,8 @@ import UniformTypeIdentifiers
 
 /// File menu jobs: import local audio, export the list, the cover poster and joining audio files.
 extension LibraryModel {
-    private static var importsDirectory: URL { URL.applicationSupportDirectory.appendingPathComponent("Earmark/imports") }
-    private static var importsIndex: URL { URL.applicationSupportDirectory.appendingPathComponent("Earmark/imports.json") }
+    private static var importsDirectory: URL { URL.applicationSupportDirectory.appendingPathComponent("Lectern Audio/imports") }
+    private static var importsIndex: URL { URL.applicationSupportDirectory.appendingPathComponent("Lectern Audio/imports.json") }
     static let audioTypes: [UTType] = [.mpeg4Audio, .mp3, UTType(filenameExtension: "m4b") ?? .audio]
 
     private struct ImportRecord: Codable { var bookmark: Data; var book: Book }
@@ -139,7 +139,7 @@ extension LibraryModel {
                     chapters: chapters, files: [BookFile(path: url.path, type: url.pathExtension.lowercased() == "mp3" ? .mp3 : .m4b)])
     }
 
-    /// File ▸ Import URL: downloads a plain http(s) audio file into Earmark's imports folder. Audible links are refused.
+    /// File ▸ Import URL: downloads a plain http(s) audio file into Lectern Audio's imports folder. Audible links are refused.
     func importFromURL() {
         let alert = NSAlert()
         alert.messageText = "Import Audio from URL"
@@ -192,7 +192,7 @@ extension LibraryModel {
     func exportList(_ format: ListFormat) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [UTType(filenameExtension: format.rawValue) ?? .data]
-        panel.nameFieldStringValue = "Earmark Library.\(format.rawValue)"
+        panel.nameFieldStringValue = "Lectern Audio Library.\(format.rawValue)"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let books = visibleBooks
@@ -213,7 +213,7 @@ extension LibraryModel {
     func exportPoster() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = "Earmark Covers.png"
+        panel.nameFieldStringValue = "Lectern Audio Covers.png"
         guard panel.runModal() == .OK, let out = panel.url else { return }
         // ponytail: first 400 covers (a 20×20 grid, 4000 px); tile smaller if bigger posters are wanted.
         let urls = visibleBooks.prefix(400).compactMap { b in

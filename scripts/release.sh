@@ -1,9 +1,9 @@
 #!/bin/bash
-# Builds a release: universal Earmark.app, ad-hoc signed, as a DMG (for people) and a ZIP plus appcast.xml (for Sparkle).
+# Builds a release: universal Lectern Audio.app, ad-hoc signed, as a DMG (for people) and a ZIP plus appcast.xml (for Sparkle).
 # Usage: scripts/release.sh <version> <build-number>     e.g. scripts/release.sh 0.2.0 7
 # Env: SPARKLE_PRIVATE_KEY (EdDSA key; without it sign_update uses the login Keychain),
 #      TAG (default v<version>), ARCHS (default "arm64 x86_64"),
-#      EARMARK_FEED_URL and DOWNLOAD_URL_PREFIX (override for local update tests).
+#      LECTERN_FEED_URL and DOWNLOAD_URL_PREFIX (override for local update tests).
 set -euo pipefail
 
 version="${1:?version}"
@@ -11,22 +11,22 @@ build_number="${2:?build number}"
 tag="${TAG:-v$version}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/build/release"
-app="$root/build/Build/Products/Release/Earmark.app"
-prefix="${DOWNLOAD_URL_PREFIX:-https://github.com/danihrndzld/Earmark/releases/download/$tag}"
+app="$root/build/Build/Products/Release/Lectern Audio.app"
+prefix="${DOWNLOAD_URL_PREFIX:-https://github.com/danihrndzld/LecternAudio/releases/download/$tag}"
 sparkle_bin="$root/build/SourcePackages/artifacts/sparkle/Sparkle/bin"
 cd "$root"
 
 settings=(MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number"
     ARCHS="${ARCHS:-arm64 x86_64}" ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO)
-if [ -n "${EARMARK_FEED_URL:-}" ]; then settings+=(EARMARK_FEED_URL="$EARMARK_FEED_URL"); fi
-xcodebuild -scheme Earmark -configuration Release -destination 'generic/platform=macOS' \
+if [ -n "${LECTERN_FEED_URL:-}" ]; then settings+=(LECTERN_FEED_URL="$LECTERN_FEED_URL"); fi
+xcodebuild -scheme LecternAudio -configuration Release -destination 'generic/platform=macOS' \
     -derivedDataPath build "${settings[@]}" build | tail -3
 
 # Sign inside out, no --deep (Sparkle's sandboxing guide). Sparkle rejects an update whose nested signatures are broken.
 bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")
-entitlements="$out/Earmark.entitlements"
+entitlements="$out/LecternAudio.entitlements"
 rm -rf "$out" && mkdir -p "$out"
-sed "s/\$(PRODUCT_BUNDLE_IDENTIFIER)/$bundle_id/g" App/Earmark.entitlements > "$entitlements"
+sed "s/\$(PRODUCT_BUNDLE_IDENTIFIER)/$bundle_id/g" App/LecternAudio.entitlements > "$entitlements"
 sign() { codesign --force --sign - --options runtime --timestamp=none "$@"; }
 sparkle="$app/Contents/Frameworks/Sparkle.framework"
 sign "$sparkle/Versions/B/XPCServices/Installer.xpc"
@@ -38,13 +38,13 @@ sign --entitlements App/FFmpeg.entitlements "$app/Contents/Helpers/ffmpeg"
 sign --entitlements "$entitlements" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
-name="Earmark-$version"
+name="LecternAudio-$version"
 rm -rf "$out/dmg" "$out/$name.zip" "$out/$name.dmg"
 ditto -c -k --keepParent "$app" "$out/$name.zip"
 mkdir -p "$out/dmg"
-ditto "$app" "$out/dmg/Earmark.app"
+ditto "$app" "$out/dmg/Lectern Audio.app"
 ln -s /Applications "$out/dmg/Applications"
-hdiutil create -volname Earmark -srcfolder "$out/dmg" -fs HFS+ -format UDZO -ov "$out/$name.dmg" > /dev/null
+hdiutil create -volname "Lectern Audio" -srcfolder "$out/dmg" -fs HFS+ -format UDZO -ov "$out/$name.dmg" > /dev/null
 rm -rf "$out/dmg"
 
 if [ -n "${SPARKLE_PRIVATE_KEY:-}" ]; then
@@ -62,9 +62,9 @@ cat > "$out/appcast.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>Earmark</title>
+    <title>Lectern Audio</title>
     <item>
-      <title>Earmark $version</title>
+      <title>Lectern Audio $version</title>
       <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
       <sparkle:version>$build_number</sparkle:version>
       <sparkle:shortVersionString>$version</sparkle:shortVersionString>

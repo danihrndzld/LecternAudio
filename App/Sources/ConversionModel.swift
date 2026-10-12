@@ -65,7 +65,7 @@ final class ConversionModel {
         guard !isRunning, let book, let library = libraryModel.library,
               let input = library.aaxURL(for: book), let output = library.conversionOutput(for: book) else { return }
         guard let ffmpegURL else {
-            message = "The bundled conversion tool is missing. Rebuild or reinstall Earmark."
+            message = "The bundled conversion tool is missing. Rebuild or reinstall Lectern Audio."
             return
         }
         let key: ActivationBytes
@@ -127,7 +127,7 @@ final class ConversionModel {
 private enum ActivationKeychain {
     static func query(account: String) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: "com.danihrndzld.earmark.aax",
+         kSecAttrService as String: "com.danihrndzld.lecternaudio.aax",
          kSecAttrAccount as String: account]
     }
 

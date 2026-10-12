@@ -132,16 +132,6 @@
         }
       }
     },
-    "Earmark has no updater yet; this choice is kept for when it does.": {
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Earmark aún no tiene actualizador; esta opción se guarda para cuando lo tenga."
-          }
-        }
-      }
-    },
     "File manager": {
       "localizations": {
         "es": {
@@ -252,22 +242,22 @@
         }
       }
     },
-    "Play books in an external player instead of Earmark": {
+    "Play books in an external player instead of Lectern Audio": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reproducir libros en un reproductor externo en lugar de Earmark"
+            "value": "Reproducir libros en un reproductor externo en lugar de Lectern Audio"
           }
         }
       }
     },
-    "Quit and reopen Earmark to apply the language.": {
+    "Quit and reopen Lectern Audio to apply the language.": {
       "localizations": {
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cierra y vuelve a abrir Earmark para aplicar el idioma."
+            "value": "Cierra y vuelve a abrir Lectern Audio para aplicar el idioma."
           }
         }
       }

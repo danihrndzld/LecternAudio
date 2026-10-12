@@ -132,7 +132,7 @@ private struct GeneralSettings: View {
                     languageChanged = true
                 }
                 if languageChanged {
-                    Text("Quit and reopen Earmark to apply the language.").font(.callout).foregroundStyle(.secondary)
+                    Text("Quit and reopen Lectern Audio to apply the language.").font(.callout).foregroundStyle(.secondary)
                 }
                 Picker("Appearance", selection: $appearance) {
                     Text("System").tag("system")
@@ -159,7 +159,7 @@ private struct AdvancedSettings: View {
     var body: some View {
         Form {
             Section("Applications") {
-                Toggle("Play books in an external player instead of Earmark", isOn: $externalPlayer)
+                Toggle("Play books in an external player instead of Lectern Audio", isOn: $externalPlayer)
                 AppPicker(title: "Audio player", key: Prefs.playerApp)
                 AppPicker(title: "Web browser", key: Prefs.browserApp)
                 AppPicker(title: "File manager", key: Prefs.fileManagerApp)

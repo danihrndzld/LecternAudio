@@ -1,4 +1,4 @@
-name: Earmark
+name: LecternAudio
 options:
   bundleIdPrefix: com.danihrndzld
   deploymentTarget:
@@ -15,9 +15,9 @@ settings:
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     # Sparkle appcast. Change this one line to move releases to another repo or name.
-    EARMARK_FEED_URL: https://github.com/danihrndzld/Earmark/releases/latest/download/appcast.xml
+    LECTERN_FEED_URL: https://github.com/danihrndzld/LecternAudio/releases/latest/download/appcast.xml
 targets:
-  Earmark:
+  LecternAudio:
     type: application
     platform: macOS
     sources: [App/Sources, App/Resources]
@@ -33,12 +33,12 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        SUFeedURL: $(EARMARK_FEED_URL)
+        SUFeedURL: $(LECTERN_FEED_URL)
         SUPublicEDKey: 6AlIbh3SEK9GPYRrelmHV7OdKneR9qJMyjkGxzNKQoM=
         SUEnableInstallerLauncherService: true
         SUEnableAutomaticChecks: true
     entitlements:
-      path: App/Earmark.entitlements
+      path: App/LecternAudio.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
@@ -52,10 +52,11 @@ targets:
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.earmark
+        PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.lecternaudio
+        PRODUCT_NAME: Lectern Audio
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Earmark
+        INFOPLIST_KEY_CFBundleDisplayName: Lectern Audio
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.entertainment
         ENABLE_HARDENED_RUNTIME: YES
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
@@ -63,7 +64,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"
 schemes:
-  Earmark:
+  LecternAudio:
     build:
       targets:
-        Earmark: all
+        LecternAudio: all

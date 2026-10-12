@@ -109,7 +109,7 @@ extension Book: Codable {
         files = (try? c.decode([BookFile].self, forKey: .files)) ?? []
     }
 
-    /// Writes the same books.json shape the decoder reads (Earmark's library.json).
+    /// Writes the same books.json shape the decoder reads (Lectern Audio's library.json).
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(asin, forKey: .asin)

@@ -22,7 +22,7 @@ import Testing
 
 @Test func urlForFileStaysInsideItsFolder() throws {
     let fm = FileManager.default
-    let root = fm.temporaryDirectory.appendingPathComponent("earmark-tests-\(UUID().uuidString)")
+    let root = fm.temporaryDirectory.appendingPathComponent("lectern-tests-\(UUID().uuidString)")
     defer { try? fm.removeItem(at: root) }
     try fm.createDirectory(at: root.appendingPathComponent("books/Sub"), withIntermediateDirectories: true)
     try fm.createDirectory(at: root.appendingPathComponent("outside"), withIntermediateDirectories: true)

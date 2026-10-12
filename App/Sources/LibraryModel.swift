@@ -38,7 +38,7 @@ enum LibraryFilter: Hashable {
 @Observable
 final class LibraryModel {
     private(set) var library: OpenAudibleLibrary? { didSet { merge() } }
-    /// The list from Audible, saved at ~/Library/Application Support/Earmark/library.json. Empty when signed out.
+    /// The list from Audible, saved at ~/Library/Application Support/Lectern Audio/library.json. Empty when signed out.
     private var audibleBooks: [Book] = [] { didSet { merge() } }
     /// Audible's list with local files from the OpenAudible folder, or just the folder when not synced.
     private(set) var books: [Book] = []
@@ -110,7 +110,7 @@ final class LibraryModel {
         syncTask = nil
         isSyncing = false
         accountIdentity = identity
-        accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Earmark/accounts/\($0)") }
+        accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Lectern Audio/accounts/\($0)") }
         downloadedLibrary = accountRoot.flatMap { try? OpenAudibleLibrary(root: $0) }
         audibleBooks = store.map { AudibleLibrary.load(from: $0) } ?? []
         lastSync = identity.flatMap { UserDefaults.standard.object(forKey: "lastSync.\($0)") as? Date }
@@ -352,9 +352,9 @@ final class LibraryModel {
         #if DEBUG
         // Lets agents and screenshots open a library without the folder picker (build with CODE_SIGN_ENTITLEMENTS= to drop the sandbox).
         let env = ProcessInfo.processInfo.environment
-        if let path = env["EARMARK_LIBRARY"] {
+        if let path = env["LECTERN_LIBRARY"] {
             open(URL(fileURLWithPath: path))
-            if let asin = env["EARMARK_SELECT"] { selection = [asin] }
+            if let asin = env["LECTERN_SELECT"] { selection = [asin] }
             return
         }
         #endif
