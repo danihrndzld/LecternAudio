@@ -12,9 +12,8 @@ final class AudibleSession {
     private var restoring: Task<AudibleAccount, Error>?
 
     init() {
-        #if DEBUG
-        if ProcessInfo.processInfo.environment["LECTERN_SNAPSHOT"] != nil { return }
-        #endif
+        // Snapshots and perf runs stay signed out, like a fresh install.
+        if Harness.env["LECTERN_SNAPSHOT"] != nil || Harness.env["LECTERN_PERF_CYCLE"] != nil { return }
         account = Keychain.load().flatMap { try? JSONDecoder().decode(AudibleAccount.self, from: $0) }
     }
 

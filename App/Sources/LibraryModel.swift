@@ -86,12 +86,10 @@ final class LibraryModel {
         accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Lectern Audio/accounts/\($0)") }
         downloadedLibrary = accountRoot.flatMap { try? OpenAudibleLibrary(root: $0) }
         audibleBooks = store.map { AudibleLibrary.load(from: $0) } ?? []
-        #if DEBUG
         // LECTERN_SYNCED_LIBRARY=<library.json> loads a synced Audible list without signing in (perf runs on real data).
-        if identity == nil, let path = ProcessInfo.processInfo.environment["LECTERN_SYNCED_LIBRARY"] {
+        if identity == nil, let path = Harness.env["LECTERN_SYNCED_LIBRARY"] {
             audibleBooks = AudibleLibrary.load(from: URL(fileURLWithPath: path))
         }
-        #endif
         lastSync = identity.flatMap { UserDefaults.standard.object(forKey: "lastSync.\($0)") as? Date }
         downloads.configure(session: session, library: self, root: accountRoot)
         if identity == nil { conversion.cancel() }
@@ -317,15 +315,12 @@ final class LibraryModel {
     func cancelExport(_ id: Book.ID) { exportTasks[id]?.cancel() }
 
     private func restore() {
-        #if DEBUG
         // Lets agents and screenshots open a library without the folder picker (build with CODE_SIGN_ENTITLEMENTS= to drop the sandbox).
-        let env = ProcessInfo.processInfo.environment
-        if let path = env["LECTERN_LIBRARY"] {
+        if let path = Harness.env["LECTERN_LIBRARY"] {
             open(URL(fileURLWithPath: path))
-            if let asin = env["LECTERN_SELECT"] { selection = [asin] }
+            if let asin = Harness.env["LECTERN_SELECT"] { selection = [asin] }
             return
         }
-        #endif
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
         if let url = Self.resolve(data) { open(url) }
     }

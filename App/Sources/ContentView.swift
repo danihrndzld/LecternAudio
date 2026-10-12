@@ -15,9 +15,7 @@ struct ContentView: View {
     @AppStorage(Prefs.appearance) private var appearance = "system"
 
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("ContentView")
-        #endif
         @Bindable var model = model
         NavigationSplitView {
             Sidebar()
@@ -76,9 +74,7 @@ struct ContentView: View {
         }
         .onChange(of: session.account?.storageID, initial: true) { _, _ in model.useAudible(session) }
         .task(id: session.account?.deviceSerial) {
-            #if DEBUG
-            if ProcessInfo.processInfo.environment["LECTERN_DOWNLOADS_PREVIEW"] == "1" { showDownloads = true }
-            #endif
+            if Harness.env["LECTERN_DOWNLOADS_PREVIEW"] == "1" { showDownloads = true }
             // The first pass is the launch; later passes are sign-ins, which always sync.
             defer { launched = true }
             guard session.account != nil else { return }
@@ -145,9 +141,7 @@ private struct Sidebar: View {
     @Environment(LibraryModel.self) private var model
 
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("Sidebar")
-        #endif
         @Bindable var model = model
         List(selection: Binding($model.filter)) {
             Section("Library") {

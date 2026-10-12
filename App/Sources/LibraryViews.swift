@@ -15,9 +15,7 @@ struct LibraryTable: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("LibraryTable")
-        #endif
         @Bindable var model = model
         Table(model.visibleBooks, selection: $model.selection, sortOrder: $model.sortOrder, columnCustomization: $model.columnCustomization) {
             TableColumn("Title", sortUsing: BookComparator(.title)) { b in
@@ -68,9 +66,7 @@ struct LibraryGrid: View {
     @Environment(Player.self) private var player
 
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("LibraryGrid")
-        #endif
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20)], spacing: 24) {
                 ForEach(model.visibleBooks) { b in
@@ -114,9 +110,7 @@ struct Cover: View {
     }()
 
     var body: some View {
-        #if DEBUG
         let _ = BodyCount.tick("Cover")
-        #endif
         let pixels = thumbnail ? 96 : 512
         let key = url.map { "\(pixels) \($0.absoluteString)" as NSString }
         let image = key.flatMap { Self.cache.object(forKey: $0) } ?? loaded.flatMap { $0.url == url ? $0.image : nil }
