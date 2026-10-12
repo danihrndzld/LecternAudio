@@ -128,77 +128,61 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             Tab("General", systemImage: "gearshape") { GeneralSettings(updater: updater) }
-            Tab("Advanced", systemImage: "gearshape.2") { AdvancedSettings() }
+            Tab("Appearance", systemImage: "paintbrush") { AppearanceSettings() }
+            Tab("Audio", systemImage: "waveform") { AudioSettings() }
+            Tab("Downloads", systemImage: "arrow.down.circle") { DownloadSettings() }
+            Tab("Conversion", systemImage: "arrow.triangle.2.circlepath") { ConversionSettings() }
+            Tab("Applications", systemImage: "square.grid.2x2") { ApplicationSettings() }
             Tab("Account", systemImage: "person.crop.circle") { AccountSettings() }
         }
         .scenePadding()
     }
 }
 
+/// Each tab is a fixed-width grouped form sized to its content.
+private extension View {
+    func settingsPane() -> some View {
+        formStyle(.grouped).frame(width: 500).fixedSize()
+    }
+}
+
 private struct GeneralSettings: View {
     let updater: SPUUpdater
-    @AppStorage(Prefs.outputFormat) private var outputFormat = "m4b"
-    @AppStorage(Prefs.mp3Bitrate) private var bitrate = 320
-    @AppStorage(Prefs.mp3VBR) private var vbr = false
-    @AppStorage(Prefs.oggQuality) private var oggQuality = 10
     @AppStorage(Prefs.refreshOnLaunch) private var refreshOnLaunch = true
     @AppStorage(Prefs.autoSync) private var autoSync = true
     @AppStorage(Prefs.autoSyncHours) private var autoSyncHours = 24
-    @AppStorage(Prefs.showProgress) private var showProgress = false
-    @AppStorage(Prefs.autoConvert) private var autoConvert = false
-    @AppStorage(Prefs.deleteAAXAfterConversion) private var deleteAAX = false
+    @AppStorage(Prefs.completionSound) private var completionSound = false
     /// Sparkle's own defaults key, read only so the toggle redraws; writes go through the updater.
     @AppStorage("SUEnableAutomaticChecks") private var automaticUpdateChecks = true
-    @AppStorage(Prefs.language) private var language = ""
-    @AppStorage(Prefs.appearance) private var appearance = "system"
-    @AppStorage(Prefs.tableFontSize) private var tableFontSize = "medium"
-    @AppStorage(Prefs.completionSound) private var completionSound = false
-    @State private var languageChanged = false
-
-    /// libvorbis nominal bitrates for 44.1 kHz stereo; mono and lower sample rates come out smaller.
-    static func oggQualityText(_ q: Int) -> String {
-        let kbps = [64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 500][min(max(q, 0), 10)]
-        return q >= 10 ? "Maximum (q10, about 500 kbps)" : "q\(q), about \(kbps) kbps"
-    }
 
     var body: some View {
         Form {
-            Section("Audio Output") {
-                Picker("Format", selection: $outputFormat) {
-                    Text("M4B").tag("m4b")
-                    Text("MP3").tag("mp3")
-                    Text("Ogg Vorbis").tag("ogg")
-                }
-                .pickerStyle(.radioGroup)
-                Text(outputFormat == "m4b"
-                     ? "Best quality; recommended if your players support it."
-                     : "Downloaded books also get an \(outputFormat == "ogg" ? "Ogg Vorbis" : "MP3") copy next to the M4B.")
-                    .font(.callout).foregroundStyle(.secondary)
-                Picker("MP3 bitrate", selection: $bitrate) {
-                    ForEach(MP3Encoder.bitrates, id: \.self) { Text("\($0) kbps").tag($0) }
-                }
-                Toggle("Variable bitrate (VBR)", isOn: $vbr)
-                Text("Used by Export MP3 and MP3 copies. 64 kbps and below are mono.")
-                    .font(.callout).foregroundStyle(.secondary)
-                Slider(value: Binding(get: { Double(oggQuality) }, set: { oggQuality = Int($0.rounded()) }), in: 0...10, step: 1) {
-                    Text("Ogg Vorbis quality")
-                }
-                Text("Quality: \(Self.oggQualityText(oggQuality)). Used by Export Ogg Vorbis and Ogg copies.")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            Section("Automation") {
+            Section("Library") {
                 Toggle("Refresh library on launch", isOn: $refreshOnLaunch)
-                Toggle("Show progress automatically when downloads start", isOn: $showProgress)
-                Toggle("Automatically convert AAX files after syncing", isOn: $autoConvert)
-                Toggle("Move AAX files to the Trash after converting them", isOn: $deleteAAX)
-                Text("Moves AAX files that OpenAudible downloaded to the Trash after a verified conversion, for books in your Audible account. OpenAudible will show them as missing.")
-                    .font(.callout).foregroundStyle(.secondary)
                 Toggle(isOn: $autoSync) {
                     Stepper("Sync with Audible every \(autoSyncHours) hours", value: $autoSyncHours, in: 1...168)
                 }
+            }
+            Section("Notifications") {
+                Toggle("Play a sound when a download, conversion or export finishes", isOn: $completionSound)
+            }
+            Section("Updates") {
                 Toggle("Disable update checks", isOn: Binding(
                     get: { !automaticUpdateChecks }, set: { updater.automaticallyChecksForUpdates = !$0 }))
             }
+        }
+        .settingsPane()
+    }
+}
+
+private struct AppearanceSettings: View {
+    @AppStorage(Prefs.language) private var language = ""
+    @AppStorage(Prefs.appearance) private var appearance = "system"
+    @AppStorage(Prefs.tableFontSize) private var tableFontSize = "medium"
+    @State private var languageChanged = false
+
+    var body: some View {
+        Form {
             Section("Language and Theme") {
                 Picker("Language", selection: $language) {
                     Text("System").tag("")
@@ -223,20 +207,62 @@ private struct GeneralSettings: View {
                     Text("Medium").tag("medium")
                     Text("Large").tag("large")
                 }
-                Toggle("Play a sound when a download, conversion or export finishes", isOn: $completionSound)
             }
         }
-        .formStyle(.grouped)
-        .frame(width: 500)
-        .fixedSize()
+        .settingsPane()
     }
 }
 
-private struct AdvancedSettings: View {
+private struct AudioSettings: View {
+    @AppStorage(Prefs.outputFormat) private var outputFormat = "m4b"
+    @AppStorage(Prefs.mp3Bitrate) private var bitrate = 320
+    @AppStorage(Prefs.mp3VBR) private var vbr = false
+    @AppStorage(Prefs.oggQuality) private var oggQuality = 10
+
+    /// libvorbis nominal bitrates for 44.1 kHz stereo; mono and lower sample rates come out smaller.
+    static func oggQualityText(_ q: Int) -> String {
+        let kbps = [64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 500][min(max(q, 0), 10)]
+        return q >= 10 ? "Maximum (q10, about 500 kbps)" : "q\(q), about \(kbps) kbps"
+    }
+
+    var body: some View {
+        Form {
+            Section("Audio Output") {
+                Picker("Format", selection: $outputFormat) {
+                    Text("M4B").tag("m4b")
+                    Text("MP3").tag("mp3")
+                    Text("Ogg Vorbis").tag("ogg")
+                }
+                .pickerStyle(.radioGroup)
+                Text(outputFormat == "m4b"
+                     ? "Best quality; recommended if your players support it."
+                     : "Downloaded books also get an \(outputFormat == "ogg" ? "Ogg Vorbis" : "MP3") copy next to the M4B.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Section("MP3") {
+                Picker("MP3 bitrate", selection: $bitrate) {
+                    ForEach(MP3Encoder.bitrates, id: \.self) { Text("\($0) kbps").tag($0) }
+                }
+                Toggle("Variable bitrate (VBR)", isOn: $vbr)
+                Text("Used by Export MP3 and MP3 copies. 64 kbps and below are mono.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Section("Ogg Vorbis") {
+                Slider(value: Binding(get: { Double(oggQuality) }, set: { oggQuality = Int($0.rounded()) }), in: 0...10, step: 1) {
+                    Text("Ogg Vorbis quality")
+                }
+                Text("Quality: \(Self.oggQualityText(oggQuality)). Used by Export Ogg Vorbis and Ogg copies.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .settingsPane()
+    }
+}
+
+private struct DownloadSettings: View {
     @Environment(LibraryModel.self) private var library
-    @AppStorage(Prefs.externalPlayer) private var externalPlayer = false
+    @AppStorage(Prefs.showProgress) private var showProgress = false
     @AppStorage(Prefs.maxDownloads) private var maxDownloads = DownloadQueue.defaultDownloads
-    @AppStorage(Prefs.maxConversions) private var maxConversions = DownloadQueue.defaultConversions
     @AppStorage(Prefs.aria2) private var aria2 = false
     @AppStorage(Prefs.aria2Connections) private var connections = 16
     @AppStorage(Prefs.aria2Split) private var split = 16
@@ -245,21 +271,14 @@ private struct AdvancedSettings: View {
 
     var body: some View {
         Form {
-            Section("Applications") {
-                Toggle("Play books in an external player instead of Lectern Audio", isOn: $externalPlayer)
-                AppPicker(title: "Audio player", key: Prefs.playerApp)
-                AppPicker(title: "Web browser", key: Prefs.browserApp)
-                AppPicker(title: "File manager", key: Prefs.fileManagerApp)
-            }
-            Section("Concurrent Jobs") {
+            Section("Queue") {
                 Stepper("Simultaneous downloads: \(maxDownloads)", value: $maxDownloads, in: DownloadQueue.concurrencyRange)
                     .onChange(of: maxDownloads) { library.downloads.advance() }
-                Stepper("Simultaneous conversions: \(maxConversions)", value: $maxConversions, in: DownloadQueue.concurrencyRange)
-                    .onChange(of: maxConversions) { Prefs.applyConversionLimit() }
-                Text("Downloads mostly wait on the network. Conversions copy the audio stream, so they mostly wait on the disk. A download that is ready to convert waits for a conversion slot, so setting conversions far below downloads leaves downloads idle.")
+                Toggle("Show progress automatically when downloads start", isOn: $showProgress)
+                Text("Downloads mostly wait on the network. A download that is ready to convert waits for a conversion slot, so setting conversions far below downloads leaves downloads idle.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Section("Downloads") {
+            Section("aria2c") {
                 Toggle("Use aria2c for faster downloads", isOn: $aria2).disabled(!AppInfo.aria2Bundled)
                 Group {
                     Stepper("Connections per server: \(connections)", value: $connections, in: 1...16)
@@ -274,9 +293,47 @@ private struct AdvancedSettings: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
-        .formStyle(.grouped)
-        .frame(width: 500)
-        .fixedSize()
+        .settingsPane()
+    }
+}
+
+private struct ConversionSettings: View {
+    @AppStorage(Prefs.maxConversions) private var maxConversions = DownloadQueue.defaultConversions
+    @AppStorage(Prefs.autoConvert) private var autoConvert = false
+    @AppStorage(Prefs.deleteAAXAfterConversion) private var deleteAAX = false
+
+    var body: some View {
+        Form {
+            Section("Queue") {
+                Stepper("Simultaneous conversions: \(maxConversions)", value: $maxConversions, in: DownloadQueue.concurrencyRange)
+                    .onChange(of: maxConversions) { Prefs.applyConversionLimit() }
+                Text("Conversions copy the audio stream, so they mostly wait on the disk.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Section("AAX Files") {
+                Toggle("Automatically convert AAX files after syncing", isOn: $autoConvert)
+                Toggle("Move AAX files to the Trash after converting them", isOn: $deleteAAX)
+                Text("Moves AAX files that OpenAudible downloaded to the Trash after a verified conversion, for books in your Audible account. OpenAudible will show them as missing.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .settingsPane()
+    }
+}
+
+private struct ApplicationSettings: View {
+    @AppStorage(Prefs.externalPlayer) private var externalPlayer = false
+
+    var body: some View {
+        Form {
+            Section("Applications") {
+                Toggle("Play books in an external player instead of Lectern Audio", isOn: $externalPlayer)
+                AppPicker(title: "Audio player", key: Prefs.playerApp)
+                AppPicker(title: "Web browser", key: Prefs.browserApp)
+                AppPicker(title: "File manager", key: Prefs.fileManagerApp)
+            }
+        }
+        .settingsPane()
     }
 }
 
