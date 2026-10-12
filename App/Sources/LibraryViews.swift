@@ -139,6 +139,12 @@ struct BookActions: View {
     let model: LibraryModel
     let player: Player
 
+    /// Right-clicking a book inside a multiple selection acts on the whole selection, as in Finder.
+    private var targets: [Book] {
+        guard model.selection.count > 1, model.selection.contains(book.id) else { return [book] }
+        return model.books.filter { model.selection.contains($0.id) }
+    }
+
     var body: some View {
         if let url = model.audioURL(for: book) {
             Button("Play", systemImage: "play.fill") { player.play(book, url: url) }
@@ -148,8 +154,10 @@ struct BookActions: View {
             Button("Convert to M4B…", systemImage: "arrow.triangle.2.circlepath") { model.convert(book) }
                 .disabled(model.conversion.isRunning)
         }
-        if model.canDownload(book) {
-            Button("Download and Convert", systemImage: "arrow.down.circle") { model.downloads.enqueue([book]) }
+        let downloadable = targets.filter(model.canDownload)
+        if !downloadable.isEmpty {
+            Button(downloadable.count > 1 ? "Download and Convert \(downloadable.count) Books" : "Download and Convert",
+                   systemImage: "arrow.down.circle") { model.downloads.enqueue(downloadable) }
         }
         if model.exports[book.id] != nil {
             Button("Cancel Export", systemImage: "xmark.circle") { model.cancelExport(book.id) }
