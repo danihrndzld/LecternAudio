@@ -35,7 +35,9 @@ jobs:
           path: Packages/AudibleCore/.build
           key: spm-linux-swift6.1-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
           restore-keys: spm-linux-swift6.1-
-      - run: swift test --package-path Packages/AudibleCore --disable-index-store
+      # No --disable-index-store here: on Linux, swift test finds tests through the index store, and a cached
+      # .build without units for a new test file fails with "Failed opening .../index/store/v5/units/...".
+      - run: swift test --package-path Packages/AudibleCore
   # Tests and the app build run on separate runners in parallel (standard runners are free on public repos).
   macos-test:
     needs: changes
