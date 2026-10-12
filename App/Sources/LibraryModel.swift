@@ -71,7 +71,10 @@ final class LibraryModel {
 
     private static let bookmarkKey = "libraryBookmark"
 
-    init() {
+    /// `restoring: false` skips the saved library folder and imports. Snapshot tests run in the app's
+    /// own defaults domain, so without this the empty state would show whatever library the owner of
+    /// the machine last opened.
+    init(restoring: Bool = true) {
         Prefs.register()
         // The limiter is created with the default, so apply the stored setting before any job runs.
         Prefs.applyConversionLimit()
@@ -79,6 +82,7 @@ final class LibraryModel {
             guard let self else { throw CancellationError() }
             try await runExport(job, progress: progress)
         }
+        guard restoring else { return }
         restore()
         restoreImports()
     }
@@ -301,7 +305,9 @@ final class LibraryModel {
 
     var totalHours: Int { books.reduce(0) { $0 + $1.seconds } / 3600 }
 
-    func open(_ url: URL) {
+    /// `remember: false` opens the folder without writing the bookmark or the recent list. Snapshot
+    /// tests run in the app's own defaults domain, so they must not leave the owner's library behind.
+    func open(_ url: URL, remember: Bool = true) {
         let isOpen = scopedRoot?.standardizedFileURL == url.standardizedFileURL
         let scoped = !isOpen && url.startAccessingSecurityScopedResource()
         do {
@@ -311,7 +317,7 @@ final class LibraryModel {
                 scopedRoot?.stopAccessingSecurityScopedResource()
                 scopedRoot = scoped ? url : nil
             }
-            if let data = try? url.bookmarkData(options: .withSecurityScope) {
+            if remember, let data = try? url.bookmarkData(options: .withSecurityScope) {
                 UserDefaults.standard.set(data, forKey: Self.bookmarkKey)
                 recentLibraries = [data] + recentLibraries.filter { Self.resolve($0)?.standardizedFileURL != url.standardizedFileURL }.prefix(4)
             }

@@ -9,6 +9,9 @@ packages:
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: "2.10.0"
+  SnapshotTesting:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    exactVersion: "1.19.6"
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -57,6 +60,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.lecternaudio
         PRODUCT_NAME: Lectern Audio
+        # Without this the module is "Lectern_Audio", sanitized from PRODUCT_NAME.
+        PRODUCT_MODULE_NAME: LecternAudio
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Lectern Audio
@@ -66,8 +71,31 @@ targets:
         SWIFT_APPROACHABLE_CONCURRENCY: YES
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "-"
+  LecternAudioTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      # The references are read from the source tree, not copied into the bundle.
+      - path: App/Tests
+        excludes: ["__Snapshots__"]
+    dependencies:
+      - target: LecternAudio
+      - package: SnapshotTesting
+        product: SnapshotTesting
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.lecternaudio.tests
+        GENERATE_INFOPLIST_FILE: YES
+        # PRODUCT_NAME is "Lectern Audio", so the host path cannot be derived from the target name.
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Lectern Audio.app/Contents/MacOS/Lectern Audio
+        BUNDLE_LOADER: $(TEST_HOST)
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES
 schemes:
   LecternAudio:
     build:
       targets:
         LecternAudio: all
+        LecternAudioTests: [test]
+    test:
+      targets: [LecternAudioTests]
