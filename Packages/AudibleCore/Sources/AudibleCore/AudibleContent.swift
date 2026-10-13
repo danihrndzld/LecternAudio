@@ -120,10 +120,10 @@ public enum AudibleContent {
             "Audible is limiting downloads for this account right now. Wait a day or two, then choose Retry."
         } else if reasons.isEmpty || reasons.contains(where: { $0.reason == "GenericError" }) {
             "Audible refused the download license without a reason, which usually means a temporary problem at Audible. Choose Retry later."
-        } else if types.contains("Client") {
-            "Audible doesn't accept this Mac's sign-in for this book. Sign out in Settings, sign in again, then choose Retry."
         } else if types.contains("Membership") || types.contains("AYCL") {
             "This book came with an Audible membership or Audible Plus, not a purchase. Audible no longer lets this account download it, because the membership ended or the book left the Plus catalog. It still appears in your Audible library."
+        } else if types.contains("Client") {
+            "Audible doesn't accept this Mac's sign-in for this book. Sign out in Settings, sign in again, then choose Retry."
         } else if types.contains("Ownership") {
             "Your Audible account doesn't own this book anymore, for example because it was returned. It still appears in your Audible library."
         } else {
