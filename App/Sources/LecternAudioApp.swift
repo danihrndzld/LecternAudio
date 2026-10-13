@@ -179,6 +179,43 @@ extension LibraryFilter {
             }
             transitions.append(("All Books: scroll one page", { library.filter = .all; scroll(toRow: 0) }, { scroll(toRow: 24) }))
             transitions.append(("All Books: scroll to row 400", { library.filter = .all; scroll(toRow: 0) }, { scroll(toRow: 400) }))
+        case "select":
+            // Selection set directly: the cost of rendering it (grid ring, inspector), without the gesture system.
+            func select(_ i: Int) { library.selection = [library.visibleBooks[i].id] }
+            transitions.append(("Grid: select book 1 → 2", { select(0) }, { select(1) }))
+            transitions.append(("Grid: select book 2 → 1", { select(1) }, { select(0) }))
+        case "click", "dblclick":
+            // A click posted to the event queue on the grid's first or second cover: mouse down, mouse up 30 ms later;
+            // `dblclick` adds a second click 130 ms later with clickCount 2. `NSApp.postEvent`, not `window.sendEvent`:
+            // only a dequeued event sets `NSApp.currentEvent`, as a real click does.
+            func click(_ cell: Int, count: Int = 1) {
+                guard let window = NSApp.windows.first, let scroll = gridScrollView(), let doc = scroll.documentView else { return }
+                // Document-view coordinates plus its safe area: on macOS 26 the sidebar floats over the detail column, so the
+                // scroll view starts at window x 0.
+                let inset = doc.safeAreaInsets
+                let local = NSPoint(x: inset.left + 24 + 75 + CGFloat(cell) * 170, y: inset.top + 24 + 60)
+                let p = doc.convert(NSPoint(x: local.x, y: doc.isFlipped ? local.y : doc.bounds.height - local.y), to: nil)
+                let hit = window.contentView?.hitTest(p)
+                let inGrid = hit?.isDescendant(of: scroll) == true
+                if Harness.env["LECTERN_CLICK_DEBUG"] != nil || !inGrid {
+                    print("click: cell \(cell) window point \(p) hit \(hit.map { String(describing: type(of: $0)) } ?? "nil")\(inGrid ? "" : " NOT IN THE GRID")")
+                }
+                for n in 1...count {
+                    for (type, delay) in [(NSEvent.EventType.leftMouseDown, 0.0), (.leftMouseUp, 0.03)] {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + Double(n - 1) * 0.13 + delay) {
+                            let e = NSEvent.mouseEvent(with: type, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                       windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: n, pressure: 1)!
+                            NSApp.postEvent(e, atStart: false)
+                        }
+                    }
+                }
+            }
+            if name == "click" {
+                transitions.append(("Grid: click cover 1 → 2", { library.selection = []; click(0) }, { click(1) }))
+                transitions.append(("Grid: click cover 2 → 1", { library.selection = []; click(1) }, { click(0) }))
+            } else {
+                transitions.append(("Grid: double-click cover 1", { library.selection = []; player.stop() }, { click(0, count: 2) }))
+            }
         default:
             guard let f = LibraryFilter(perfName: name) else { continue }
             transitions.append(("\(f.title) → All Books", { library.filter = f }, { library.filter = .all }))
@@ -195,13 +232,15 @@ extension LibraryFilter {
     let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "perf cycle")
     defer { ProcessInfo.processInfo.endActivity(activity) }
     NSApp.windows.first?.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
+    print("perf: doubleClickInterval \(NSEvent.doubleClickInterval) s, gesture variant \(env["LECTERN_GRID_GESTURE"] ?? "A")")
+    if transitions.contains(where: { $0.name.hasPrefix("Grid: click") }) { NSApp.activate(); NSApp.windows.first?.makeKeyAndOrderFront(nil) }
     try? await Task.sleep(for: .seconds(3))
     let signposter = OSSignposter(subsystem: "com.danihrndzld.lecternaudio", category: .pointsOfInterest)
     func ms(_ d: Duration) -> Int { Int(d / .milliseconds(1)) }
     func median(_ xs: [Int]) -> Int { xs.sorted()[xs.count / 2] }
     let mode = env["LECTERN_PERF_LABEL"] ?? (UserDefaults.standard.bool(forKey: "viewMode") ? "grid" : "list")
     for transition in transitions {
-        var firsts: [Int] = [], busies: [Int] = [], longests: [Int] = [], settleds: [Int] = [], bodies: [String: [Int]] = [:]
+        var selections: [Int] = [], plays: [Int] = [], firsts: [Int] = [], busies: [Int] = [], longests: [Int] = [], settleds: [Int] = [], bodies: [String: [Int]] = [:]
         var counts = (before: 0, after: 0)
         for _ in 0..<n {
             spans.start()
@@ -211,8 +250,16 @@ extension LibraryFilter {
             let state = signposter.beginInterval("Filter switch", id: signposter.makeSignpostID(), "\(transition.name)")
             BodyCount.counts = [:]
             spans.start()
+            selectionChangedAt = nil
+            let goStart = ContinuousClock.now
+            // Fires synchronously in `selection`'s willSet, on the main thread.
+            withObservationTracking { _ = library.selection } onChange: { selectionChangedAt = .now }
+            playedAt = nil
+            withObservationTracking { _ = player.book } onChange: { playedAt = .now }
             transition.go()
             let result = await spans.settle()
+            if let at = selectionChangedAt { selections.append(ms(at - goStart)) }
+            if let at = playedAt { plays.append(ms(at - goStart)) }
             signposter.endInterval("Filter switch", state)
             counts.after = library.visibleBooks.count
             if env["LECTERN_PERF_TRACE"] != nil, settleds.isEmpty {
@@ -226,6 +273,8 @@ extension LibraryFilter {
         }
         print("perf: \(mode) \(transition.name) x\(n), \(counts.before) → \(counts.after) of \(library.books.count) books, median ms: settled \(median(settleds)), first \(median(firsts)), busy \(median(busies)), longest \(median(longests))")
         print("perf:   bodies:", bodies.sorted { $0.key < $1.key }.map { "\($0.key) \(median($0.value))" }.joined(separator: ", "))
+        if !selections.isEmpty { print("perf:   selection changed after ms: \(selections)") }
+        if !plays.isEmpty { print("perf:   played after ms: \(plays)") }
         print("perf:   settled \(settleds) first \(firsts) busy \(busies) longest \(longests)")
     }
     library.search = ""
@@ -236,8 +285,21 @@ extension LibraryFilter {
         menu.update()
         print("perf: context menu for \(book.title):", menu.items.map(\.title))
     }
+    print("perf: player after the cycles:", player.book?.title ?? "nil")
     fflush(stdout)
     NSApp.terminate(nil)
+}
+
+nonisolated(unsafe) private var selectionChangedAt: ContinuousClock.Instant?
+nonisolated(unsafe) private var playedAt: ContinuousClock.Instant?
+
+@MainActor private func gridScrollView() -> NSScrollView? {
+    func find(_ v: NSView) -> NSScrollView? {
+        if let s = v as? NSScrollView, !(s.documentView is NSTableView), s.frame.width > 400 { return s }
+        for sub in v.subviews { if let s = find(sub) { return s } }
+        return nil
+    }
+    return NSApp.windows.first?.contentView.flatMap(find)
 }
 
 /// Main-thread busy spans between run-loop wake-ups and sleeps, read from a background thread so the polling itself
