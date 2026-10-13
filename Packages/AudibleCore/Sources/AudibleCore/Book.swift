@@ -77,6 +77,9 @@ public struct Book: Identifiable, Hashable, Sendable {
     /// `CodingKeys`, so the saved catalog, `books.json` and `queue.json` keep their existing format
     /// and a book's ownership is recomputed on every sync rather than persisted (issue #47).
     public var accountIDs: [String] = []
+    /// An Audible Plus title this account can no longer listen to: the book left the Plus catalog or the
+    /// membership ended. Audible keeps it in the library but denies its download license.
+    public var unavailable = false
 
     public var hasAudio: Bool { files.contains { [.m4b, .mp3].contains($0.type) } }
     public var hasEncrypted: Bool { files.contains { [.aax, .aaxc].contains($0.type) } }
@@ -90,6 +93,8 @@ extension Book: Codable {
         case asin, key, title, author, publisher, genre, summary, description, seconds, region, chapters, files
         case narratedBy = "narrated_by", rating = "rating_average", ratingCount = "rating_count"
         case releaseDate = "release_date", purchaseDate = "purchase_date", readStatus = "read_status", imageURL = "image_url"
+        // Not an OpenAudible field. Written only when true, so books.json keeps OpenAudible's shape.
+        case unavailable
     }
 
     public init(from decoder: Decoder) throws {
@@ -113,6 +118,7 @@ extension Book: Codable {
         imageURL = URL(string: s(.imageURL))
         chapters = (try? c.decode([Chapter].self, forKey: .chapters)) ?? []
         files = (try? c.decode([BookFile].self, forKey: .files)) ?? []
+        unavailable = (try? c.decode(Bool.self, forKey: .unavailable)) ?? false
     }
 
     /// Writes the same books.json shape the decoder reads (Lectern Audio's library.json).
@@ -136,6 +142,7 @@ extension Book: Codable {
         try c.encodeIfPresent(imageURL?.absoluteString, forKey: .imageURL)
         try c.encode(chapters, forKey: .chapters)
         try c.encode(files, forKey: .files)
+        if unavailable { try c.encode(true, forKey: .unavailable) }
     }
 
     nonisolated(unsafe) static let day: DateFormatter = {

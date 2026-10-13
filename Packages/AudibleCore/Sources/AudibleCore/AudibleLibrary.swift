@@ -6,7 +6,7 @@ import FoundationNetworking
 /// The user's Audible library list (metadata only), fetched with signed `GET /1.0/library` calls.
 public enum AudibleLibrary {
     /// OpenAudible's `library_groups` (spec §2.1).
-    public static let responseGroups = "product_attrs,contributors,customer_rights,relationships,media,product_desc,product_extended_attrs,pdf_url,series,category_ladders,rating,sku,listening_status,percent_complete,is_finished"
+    public static let responseGroups = "product_attrs,contributors,customer_rights,relationships,media,product_desc,product_extended_attrs,product_plans,pdf_url,series,category_ladders,rating,sku,listening_status,percent_complete,is_finished"
 
     public typealias Send = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
@@ -81,6 +81,17 @@ public enum AudibleLibrary {
         var product_images: [String: String]?
         var is_finished: Bool?
         var percent_complete: Double?
+        struct Plan: Decodable { var plan_name: String? }
+        var is_ayce: Bool?
+        var plans: [Plan]?
+
+        /// Added with Audible Plus and no Plus or free plan covers it now, so Audible denies its license.
+        /// Libation's rule (`LibraryBookImporter.isPlusTitleUnavailable`, plan names from AudibleApi's `Plan.IsAyce`).
+        var unavailable: Bool {
+            is_ayce == true && !(plans ?? []).contains { plan in
+                ["Minerva", "AYCL", "Free"].contains { plan.plan_name?.localizedCaseInsensitiveContains($0) == true }
+            }
+        }
     }
 
     static func book(from item: Item, marketplace: Marketplace) -> Book {
@@ -88,7 +99,7 @@ public enum AudibleLibrary {
         func names(_ people: [Item.Person]?) -> String { (people ?? []).map(\.name).joined(separator: ", ") }
         // Only the calendar day matters, as in books.json.
         func day(_ s: String?) -> Date? { s.flatMap { Book.day.date(from: String($0.prefix(10))) } }
-        return Book(
+        var book = Book(
             asin: item.asin, key: item.asin,
             title: HTMLText.markdown(item.title ?? ""),
             author: names(item.authors), narratedBy: names(item.narrators),
@@ -102,6 +113,8 @@ public enum AudibleLibrary {
             readStatus: item.is_finished == true ? .finished : (item.percent_complete ?? 0) > 0 ? .reading : nil,
             imageURL: item.product_images?["500"].flatMap(URL.init(string:)),
             chapters: [], files: [])
+        book.unavailable = item.unavailable
+        return book
     }
 
     /// One signed-in account's synced catalog.

@@ -70,7 +70,7 @@ You can start from an OpenAudible folder, from your Audible account, or from bot
 
 1. **Open your OpenAudible library.** Choose File, then Open OpenAudible Library, and select the folder that contains `books.json`. Lectern Audio reads the folder and doesn't change OpenAudible's files.
 2. **Sign in to Audible.** Open Settings, go to Account, and choose Sign In to Audible. Amazon's sign in page opens inside Lectern Audio and handles the captcha and the two step code itself.
-3. **Sync.** Click the sync button in the toolbar. Books that are only in your account appear under In Audible Only in the sidebar, ready to download.
+3. **Sync.** Click the sync button in the toolbar. Books that are only in your account appear under In Audible Only in the sidebar. Not Downloaded shows the ones you can still download, leaving out Audible Plus titles that left the Plus catalog or that your ended membership no longer covers.
 
 Your account tokens stay in the macOS Keychain. When you sign out, Lectern Audio removes the device from your Amazon account and deletes the saved tokens.
 

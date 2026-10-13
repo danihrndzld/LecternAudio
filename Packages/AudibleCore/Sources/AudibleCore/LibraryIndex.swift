@@ -2,17 +2,18 @@ import Foundation
 
 /// A sidebar entry: which books the library list shows.
 public enum LibraryFilter: Hashable, Sendable {
-    case all, downloaded, notConverted, audibleOnly, reading, finished, pdfs
+    case all, downloaded, notDownloaded, notConverted, audibleOnly, reading, finished, pdfs
     case genre(String)
     /// Books owned by one account, by `AudibleAccount.storageID` (issue #47).
     case account(String)
 
-    public static let fixed: [LibraryFilter] = [.all, .downloaded, .notConverted, .audibleOnly, .reading, .finished, .pdfs]
+    public static let fixed: [LibraryFilter] = [.all, .downloaded, .notDownloaded, .notConverted, .audibleOnly, .reading, .finished, .pdfs]
 
     public var title: String {
         switch self {
         case .all: "All Books"
         case .downloaded: "Downloaded"
+        case .notDownloaded: "Not Downloaded"
         case .notConverted: "Not Converted"
         case .audibleOnly: "In Audible Only"
         case .reading: "Listening"
@@ -30,6 +31,8 @@ public enum LibraryFilter: Hashable, Sendable {
         case .downloaded: b.hasAudio
         case .notConverted: b.hasEncrypted && !b.hasAudio
         case .audibleOnly: !b.hasEncrypted && !b.hasAudio
+        // In Audible Only minus the books Audible no longer lets this account download.
+        case .notDownloaded: !b.hasEncrypted && !b.hasAudio && !b.unavailable
         case .reading: b.readStatus == .reading
         case .finished: b.readStatus == .finished
         case .pdfs: b.hasPDF
