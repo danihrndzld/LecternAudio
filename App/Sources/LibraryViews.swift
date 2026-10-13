@@ -32,11 +32,14 @@ struct LibraryGrid: View {
                 ForEach(model.visibleBooks) { b in
                     GridCell(book: b, art: model.artURL(for: b), selected: model.selection.contains(b.id))
                         .contentShape(Rectangle())
-                        // Select on the first click. `onTapGesture` beside `onTapGesture(count: 2)` waits out the
-                        // double-click interval (0.5 s by default) before it fires, which delayed the inspector.
-                        .simultaneousGesture(TapGesture().onEnded { model.selection = [b.id] })
-                        .onTapGesture(count: 2) {
-                            if let url = model.audioURL(for: b) { player.play(b, url: url) }
+                        // One tap gesture. Beside `onTapGesture(count: 2)` SwiftUI held the single tap until the double-click
+                        // interval ran out (selection ~350 ms after mouse up, also as a `simultaneousGesture`; docs/memory.md).
+                        // AppKit's click count on the mouse-up tells a double click apart with no timer. Check the event type:
+                        // `clickCount` raises on a non-mouse event and AppKit swallows exceptions in event dispatch.
+                        .onTapGesture {
+                            if model.selection != [b.id] { model.selection = [b.id] }
+                            if let e = NSApp.currentEvent, e.type == .leftMouseUp || e.type == .leftMouseDown, e.clickCount == 2,
+                               let url = model.audioURL(for: b) { player.play(b, url: url) }
                         }
                         .contextMenu { BookActions(book: b, model: model, player: player) }
                 }

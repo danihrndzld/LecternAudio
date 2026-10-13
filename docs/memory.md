@@ -45,6 +45,19 @@ Lessons:
 - When a `sample` call tree shows `_doAutomaticRowHeightsForInsertedAndVisibleRows` or hundreds of hosted views created and destroyed per update, the fix is a fixed-height AppKit table, not a tweak to the SwiftUI one.
 - An ad-hoc signed test build reading the owner's external disk (`/Volumes/Mac`) blocks in `open()` on the removable-volume consent prompt; a stray build from PR #41 sat there for an hour. Use a local copy of `books.json` and `art/`.
 
+### A click in the cover grid selected 350 ms late (0.3.4 and 0.3.5)
+
+The owner reported that clicking any cover in the grid took about a second to show the book in the inspector; the list was immediate. Each cell had `.onTapGesture(count: 2)` (play) beside a single tap (select). SwiftUI holds the single tap until the double-click interval has run out, also when the single tap is a `simultaneousGesture` (PR #74 tried that and changed nothing).
+
+Measured with real mouse events posted to the grid (`LECTERN_PERF_FROM=click,dblclick`, Release, 514 books from the owner's catalog, `NSEvent.doubleClickInterval` 0.5 s): selection 384 to 386 ms after mouse down, main thread quiet after 416 to 418 ms, but only about 40 ms of main-thread work. A Time Profiler trace showed the main thread asleep in `mach_msg2_trap` for the rest: a timer, not work. Without the count-2 gesture the selection changed 31 to 35 ms after mouse down (the synthetic mouse up is at 30 ms). The context menu made no difference, and drawing the selection and inspector cost 29 to 40 ms.
+
+Fix: one `onTapGesture` that selects, and plays when `NSApp.currentEvent` is a mouse event with `clickCount == 2`. Check the event type first: `clickCount` raises on any other event, and AppKit swallows exceptions during event dispatch, so the click would silently do nothing. After: selection 31 to 35 ms after mouse down, settled 65 to 72 ms; a double click plays 162 to 177 ms after the first mouse down (the second mouse up is at 160 ms).
+
+Lessons:
+- In the harness, post synthetic clicks with `NSApp.postEvent`, not `window.sendEvent`: only a dequeued event sets `NSApp.currentEvent`.
+- On macOS 26 the sidebar floats over the detail column, so the grid's scroll view starts at window x 0. Compute click points from the grid's document view plus its safe area; points from the scroll view landed on a sidebar row.
+- A sandboxed test build signed differently from an earlier one with the same bundle id hung in `_libsecinit_appsandbox` at launch. For measurements, sign the build ad hoc without the sandbox entitlement.
+
 ## Crashes
 
 ### Environment objects in table cells (first build)
