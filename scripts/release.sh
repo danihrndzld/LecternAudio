@@ -1,8 +1,9 @@
 #!/bin/bash
-# Builds a release: Apple silicon Lectern Audio.app, ad-hoc signed, as a DMG (for people) and a ZIP plus appcast.xml (for Sparkle).
+# Builds a release: Apple silicon Lectern Audio.app, signed with SIGN_IDENTITY, as a DMG (for people) and a ZIP plus appcast.xml (for Sparkle).
 # Usage: scripts/release.sh <version> <build-number>     e.g. scripts/release.sh 0.2.0 7
 # Env: SPARKLE_PRIVATE_KEY (EdDSA key; without it sign_update uses the login Keychain),
-#      TAG (default v<version>), ARCHS (default arm64; "x86_64" for an Intel build, "arm64 x86_64" for universal),
+#      SIGN_IDENTITY (codesign identity; default "-", ad hoc. A certificate keeps the designated requirement the same
+#      across versions, so the Keychain's "Always Allow" survives updates), TAG (default v<version>), ARCHS (default arm64; "x86_64" for an Intel build, "arm64 x86_64" for universal),
 #      LECTERN_FEED_URL and DOWNLOAD_URL_PREFIX (override for local update tests).
 set -euo pipefail
 
@@ -28,7 +29,9 @@ bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Content
 entitlements="$out/LecternAudio.entitlements"
 rm -rf "$out" && mkdir -p "$out"
 sed "s/\$(PRODUCT_BUNDLE_IDENTIFIER)/$bundle_id/g" App/LecternAudio.entitlements > "$entitlements"
-sign() { codesign --force --sign - --options runtime --timestamp=none "$@"; }
+identity="${SIGN_IDENTITY:--}"
+if [ "$identity" = "-" ]; then timestamp=--timestamp=none; else timestamp=--timestamp; fi
+sign() { codesign --force --sign "$identity" --options runtime "$timestamp" "$@"; }
 sparkle="$app/Contents/Frameworks/Sparkle.framework"
 sign "$sparkle/Versions/B/XPCServices/Installer.xpc"
 sign --preserve-metadata=entitlements "$sparkle/Versions/B/XPCServices/Downloader.xpc"
@@ -39,6 +42,7 @@ sign --entitlements App/FFmpeg.entitlements "$app/Contents/Helpers/ffmpeg"
 sign --entitlements App/Aria2.entitlements "$app/Contents/Helpers/aria2c"
 sign --entitlements "$entitlements" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
+codesign -d -r- "$app"
 
 name="LecternAudio-$version"
 rm -rf "$out/dmg" "$out/$name.zip" "$out/$name.dmg"
