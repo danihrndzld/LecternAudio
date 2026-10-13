@@ -65,6 +65,12 @@ private func registeredAccount() throws -> AudibleAccount {
         .hasPrefix("Audible is limiting downloads"))
     #expect(message([["validationType": "Ownership", "rejectionReason": "ContentEligibility"]]).hasPrefix("Your Audible account doesn't own"))
     #expect(message([["validationType": "Client", "rejectionReason": "RequesterEligibility"]]).hasPrefix("Audible doesn't accept"))
+    // A Plus book that left the catalog also fails the Client check.
+    #expect(message([["validationType": "Membership", "rejectionReason": "RequesterEligibility"],
+                     ["validationType": "Ownership", "rejectionReason": "RequesterEligibility"],
+                     ["validationType": "Client", "rejectionReason": "RequesterEligibility"],
+                     ["validationType": "AYCL", "rejectionReason": "ContentEligibility"]])
+        .hasPrefix("This book came with an Audible membership or Audible Plus"))
     #expect(message([["validationType": "Ownership", "rejectionReason": "GenericError"]]).hasPrefix("Audible refused the download license without a reason"))
     #expect(message([]) == "Audible refused the download license without a reason, which usually means a temporary problem at Audible. Choose Retry later.")
 }
