@@ -164,3 +164,28 @@ private actor Log {
     #expect(Chapter.millis(-.infinity) == nil)
     #expect(Chapter.millis(1e300) == nil)
 }
+
+@Test func plusTitleWithoutAPlusPlanIsUnavailable() throws {
+    let json = #"""
+    {"items": [
+      {"asin": "B0PURCHASE", "is_ayce": false, "plans": []},
+      {"asin": "B0PLUSLIVE", "is_ayce": true, "plans": [{"plan_name": "US Minerva"}, {"plan_name": "SpecialBenefit"}]},
+      {"asin": "B0PLUSGONE", "is_ayce": true, "plans": [{"plan_name": "SpecialBenefit"}]},
+      {"asin": "B0PLUSNONE", "is_ayce": true}
+    ]}
+    """#
+    let items = try JSONDecoder().decode(AudibleLibrary.Page.self, from: Data(json.utf8)).items
+    let books = items.map { AudibleLibrary.book(from: $0, marketplace: Marketplace.all[0]) }
+    #expect(books.map(\.unavailable) == [false, false, true, true])
+
+    // Saved only when true, and read back from the saved catalog.
+    let saved = try JSONDecoder().decode([Book].self, from: JSONEncoder().encode(books))
+    #expect(saved.map(\.unavailable) == [false, false, true, true])
+    #expect(try !String(decoding: JSONEncoder().encode(books[0]), as: UTF8.self).contains("unavailable"))
+
+    var index = LibraryIndex()
+    index.books = books
+    #expect(index.count(.audibleOnly) == 4)
+    #expect(index.count(.notDownloaded) == 2)
+    #expect(LibraryJobs.downloadable(books, owned: Set(books.map(\.asin))).map(\.asin) == ["B0PURCHASE", "B0PLUSLIVE"])
+}

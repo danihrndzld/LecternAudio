@@ -5,12 +5,13 @@ import Foundation
 /// work list when the menu item is chosen, from one rule.
 public enum LibraryJobs {
     /// Books this account owns with no local file at all: no playable audio and no AAX waiting to be
-    /// converted. The same rule as the sidebar's In Audible Only (`LibraryFilter.audibleOnly`).
+    /// converted, leaving out Plus titles Audible no longer lets it download. The same rule as the
+    /// sidebar's Not Downloaded (`LibraryFilter.notDownloaded`).
     ///
     /// `owned` is the ASINs of the synced Audible catalog: a book only in the local folder cannot be
     /// downloaded, however little audio it has.
     public static func downloadable(_ books: [Book], owned: Set<String>) -> [Book] {
-        books.filter { !$0.asin.isEmpty && !$0.hasEncrypted && !$0.hasAudio && owned.contains($0.asin) }
+        books.filter { !$0.asin.isEmpty && !$0.hasEncrypted && !$0.hasAudio && !$0.unavailable && owned.contains($0.asin) }
     }
 
     /// Books with an encrypted file and no playable audio that this account can activate, so the

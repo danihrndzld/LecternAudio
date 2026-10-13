@@ -94,6 +94,7 @@ struct DiagnosticsView: View {
         Last sync: \(library.lastSync?.formatted(date: .abbreviated, time: .shortened) ?? "never")
         Books: \(b.count) (\(library.totalHours) hours)
         Downloaded: \(library.count(.downloaded))
+        Not downloaded: \(library.count(.notDownloaded))
         Not converted: \(library.count(.notConverted))
         In Audible only: \(library.count(.audibleOnly))
         With PDF: \(library.count(.pdfs))
