@@ -30,27 +30,38 @@ struct LibraryGrid: View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20)], spacing: 24) {
                 ForEach(model.visibleBooks) { b in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Cover(url: model.artURL(for: b))
-                            .aspectRatio(1, contentMode: .fit)
-                            .overlay(alignment: .bottomTrailing) { StatusBadge(book: b).padding(6) }
-                            .overlay {
-                                if model.selection.contains(b.id) {
-                                    RoundedRectangle(cornerRadius: 8).stroke(.tint, lineWidth: 3)
-                                }
-                            }
-                        Text(b.title).font(.callout.weight(.medium)).lineLimit(2)
-                        Text(b.author).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) {
-                        if let url = model.audioURL(for: b) { player.play(b, url: url) }
-                    }
-                    .onTapGesture { model.selection = [b.id] }
-                    .contextMenu { BookActions(book: b, model: model, player: player) }
+                    GridCell(book: b, art: model.artURL(for: b), selected: model.selection.contains(b.id))
+                        .contentShape(Rectangle())
+                        // Select on the first click. `onTapGesture` beside `onTapGesture(count: 2)` waits out the
+                        // double-click interval (0.5 s by default) before it fires, which delayed the inspector.
+                        .simultaneousGesture(TapGesture().onEnded { model.selection = [b.id] })
+                        .onTapGesture(count: 2) {
+                            if let url = model.audioURL(for: b) { player.play(b, url: url) }
+                        }
+                        .contextMenu { BookActions(book: b, model: model, player: player) }
                 }
             }
             .padding(24)
+        }
+    }
+}
+
+/// Its own view with plain inputs, so a selection change re-renders the two cells whose `selected` changed.
+private struct GridCell: View {
+    let book: Book
+    let art: URL?
+    let selected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Cover(url: art)
+                .aspectRatio(1, contentMode: .fit)
+                .overlay(alignment: .bottomTrailing) { StatusBadge(book: book).padding(6) }
+                .overlay {
+                    if selected { RoundedRectangle(cornerRadius: 8).stroke(.tint, lineWidth: 3) }
+                }
+            Text(book.title).font(.callout.weight(.medium)).lineLimit(2)
+            Text(book.author).font(.caption).foregroundStyle(.secondary).lineLimit(1)
         }
     }
 }
