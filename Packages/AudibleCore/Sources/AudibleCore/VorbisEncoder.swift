@@ -60,6 +60,15 @@ public final class VorbisEncoder {
         vi.deallocate(); vc.deallocate(); vd.deallocate(); vb.deallocate(); os.deallocate()
     }
 
+    /// libvorbis's nominal bitrate in kbps for a VBR `quality` (-0.1...1.0) at this format, or 0 if libvorbis refuses it.
+    public static func nominalBitrate(quality: Float, sampleRate: Int, channels: Int) -> Int {
+        var vi = vorbis_info()
+        vorbis_info_init(&vi)
+        defer { vorbis_info_clear(&vi) }
+        guard vorbis_encode_init_vbr(&vi, channels, sampleRate, quality) == 0 else { return 0 }
+        return vi.bitrate_nominal / 1000
+    }
+
     /// `pcm` holds interleaved frames (`count / channels` samples per channel), -1...1.
     public func encode(_ pcm: UnsafeBufferPointer<Float>) -> Data {
         let frames = pcm.count / channels

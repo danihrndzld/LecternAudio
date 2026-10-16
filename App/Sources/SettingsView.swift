@@ -219,10 +219,12 @@ private struct AudioSettings: View {
     @AppStorage(Prefs.mp3VBR) private var vbr = false
     @AppStorage(Prefs.oggQuality) private var oggQuality = 10
 
-    /// libvorbis nominal bitrates for 44.1 kHz stereo; mono and lower sample rates come out smaller.
+    /// Assumes 22.05 kHz stereo: Audible's "High" AAX (what downloads request) is 64 kbps AAC at 22.05 kHz stereo, and OggExport keeps the source format.
+    private static let oggKbps = (0...10).map { VorbisEncoder.nominalBitrate(quality: Float($0) / 10, sampleRate: 22_050, channels: 2) }
+
     static func oggQualityText(_ q: Int) -> String {
-        let kbps = [64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 500][min(max(q, 0), 10)]
-        return q >= 10 ? "Maximum (q10, about 500 kbps)" : "q\(q), about \(kbps) kbps"
+        let kbps = oggKbps[min(max(q, 0), 10)]
+        return q >= 10 ? "Maximum (q10, about \(kbps) kbps)" : "q\(q), about \(kbps) kbps"
     }
 
     var body: some View {
