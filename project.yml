@@ -101,3 +101,11 @@ schemes:
         LecternAudioTests: [test]
     test:
       targets: [LecternAudioTests]
+  # CI's single xcodebuild invocation: builds the app for testing and runs the AudibleCore package tests.
+  CI:
+    build:
+      targets:
+        LecternAudio: [test]
+    test:
+      targets:
+        - package: AudibleCore/AudibleCoreTests

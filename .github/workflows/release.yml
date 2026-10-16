@@ -41,7 +41,6 @@ jobs:
             build/ModuleCache.noindex
             build/SDKExplicitPrecompiledModules
             build/SourcePackages
-            ~/Library/Caches/org.swift.swiftpm/manifests
           key: dd-macos-${{ github.sha }}
           restore-keys: dd-macos-
       - name: Install XcodeGen

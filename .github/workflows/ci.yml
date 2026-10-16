@@ -80,7 +80,7 @@ jobs:
             build/aria2-1.37.0
           key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
       # Products, module caches and object files of the last main build, plus package checkouts and the Sparkle
-      # binary (build/SourcePackages) and the SwiftPM manifest cache, in one archive. Package sources keep their
+      # binary (build/SourcePackages), in one archive. Package sources keep their
       # cached mtimes, so their objects (BoringSSL, most of the C compile) are reused; the checkout's files
       # rebuild. release.yml restores this same path list.
       - id: dd
@@ -91,7 +91,6 @@ jobs:
             build/ModuleCache.noindex
             build/SDKExplicitPrecompiledModules
             build/SourcePackages
-            ~/Library/Caches/org.swift.swiftpm/manifests
           key: dd-macos-${{ github.sha }}
           restore-keys: dd-macos-
       - name: Install XcodeGen
@@ -101,11 +100,13 @@ jobs:
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
       - run: xcodegen generate
-      # The AudibleCoreTests scheme (project.yml) builds the app for testing and runs the package's tests from the
-      # test bundle. The first lines show when the build really starts, the last ones the test results; the full log
-      # stays in $RUNNER_TEMP for the rest of the job.
+      # The CI scheme (project.yml) builds the app for testing and runs the AudibleCore package tests. The app
+      # restored from the dd cache is deleted first, so the smoke test below can only launch this build: until
+      # this PR the scheme was Xcode's package-only AudibleCoreTests, which never built the app. The first lines
+      # show when the build really starts, the last ones the test results; the full log stays in $RUNNER_TEMP.
       - run: |
-          xcodebuild test -scheme AudibleCoreTests -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
+          rm -rf "build/Build/Products/Debug/Lectern Audio.app"
+          xcodebuild test -scheme CI -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
             | tee "$RUNNER_TEMP/xcodebuild.log" | awk 'NR <= 20 { print; fflush() }' || status=$?
           echo ...
@@ -158,5 +159,4 @@ jobs:
             build/ModuleCache.noindex
             build/SDKExplicitPrecompiledModules
             build/SourcePackages
-            ~/Library/Caches/org.swift.swiftpm/manifests
           key: ${{ steps.dd.outputs.cache-primary-key }}
