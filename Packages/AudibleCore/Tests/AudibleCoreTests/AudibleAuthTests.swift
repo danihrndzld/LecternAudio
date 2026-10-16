@@ -72,7 +72,7 @@ private func account(key: String = "") -> AudibleAccount {
 }
 
 @Test func registerBody() throws {
-    let r = fixedSignIn.registerRequest(code: "ANcode123")
+    let r = try fixedSignIn.registerRequest(code: "ANcode123")
     #expect(r.url?.absoluteString == "https://api.amazon.com/auth/register")
     #expect(r.httpMethod == "POST")
     let data = try #require(r.httpBody)
