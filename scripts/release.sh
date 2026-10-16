@@ -89,3 +89,5 @@ EOF
 echo "$out/$name.dmg"
 echo "$out/$name.zip"
 echo "$out/appcast.xml"
+
+# ci warm-check probe (throwaway)
