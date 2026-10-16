@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 @Observable
 final class LibraryModel {
     private(set) var library: OpenAudibleLibrary? { didSet { merge() } }
-    /// The list from Audible, saved at ~/Library/Application Support/Lectern Audio/library.json. Empty when signed out.
+    /// The list from Audible, saved at ~/Library/Application Support/Lectern Audio/accounts/<storageID>/catalog.json. Empty when signed out.
     private var audibleBooks: [Book] = [] { didSet { merge() } }
     /// Audible's list with local files from the OpenAudible folder, or just the folder when not synced.
     private(set) var books: [Book] = [] { didSet { index.books = books } }
@@ -121,7 +121,7 @@ final class LibraryModel {
         accountRoot = identity.map { URL.applicationSupportDirectory.appendingPathComponent("Lectern Audio/accounts/\($0)") }
         downloadedLibrary = accountRoot.flatMap { try? OpenAudibleLibrary(root: $0) }
         audibleBooks = store.map { AudibleLibrary.load(from: $0) } ?? []
-        // LECTERN_SYNCED_LIBRARY=<library.json> loads a synced Audible list without signing in (perf runs on real data).
+        // LECTERN_SYNCED_LIBRARY=<catalog.json> loads a synced Audible list without signing in (perf runs on real data).
         if identity == nil, let path = Harness.env["LECTERN_SYNCED_LIBRARY"] {
             audibleBooks = AudibleLibrary.load(from: URL(fileURLWithPath: path))
         }
