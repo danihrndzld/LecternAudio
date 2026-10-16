@@ -131,25 +131,29 @@ final class LibraryModel {
         merge()
     }
 
-    func sync(_ account: AudibleAccount) {
+    /// `quick` fetches only books bought since the last sync (less a day for clock skew) and merges them
+    /// into the saved list. Without a last sync or a saved list it falls back to a full fetch.
+    func sync(_ account: AudibleAccount, quick: Bool = false) {
         guard !isSyncing, account.storageID == accountIdentity, let store else { return }
         isSyncing = true
         syncedCount = 0
         let generation = UUID()
         syncGeneration = generation
+        let since = quick && !audibleBooks.isEmpty ? lastSync?.addingTimeInterval(-86_400) : nil
         syncTask = Task {
             do {
-                let fetched = try await AudibleLibrary.fetch(account: account, send: { try await AudibleHTTP.data(for: $0) }) { n in
+                let fetched = try await AudibleLibrary.fetch(account: account, purchasedAfter: since, send: { try await AudibleHTTP.data(for: $0) }) { n in
                     Task { @MainActor in if self.syncGeneration == generation { self.syncedCount = n } }
                 }
                 try Task.checkCancellation()
                 guard accountIdentity == account.storageID, syncGeneration == generation else { return }
-                try AudibleLibrary.save(fetched, to: store)
-                audibleBooks = fetched
+                let catalog = since == nil ? fetched : AudibleLibrary.merge(saved: audibleBooks, fetched: fetched)
+                try AudibleLibrary.save(catalog, to: store)
+                audibleBooks = catalog
                 lastSync = .now
-                AppLog.shared.info("Synced \(fetched.count) books from Audible")
+                AppLog.shared.info(since == nil ? "Synced \(fetched.count) books from Audible" : "Quick sync fetched \(fetched.count) books purchased since \(since!)")
                 // Books with a local AAX are left to the conversion below instead of downloaded again.
-                if downloads.automaticallyDownload { downloads.enqueue(LibraryJobs.downloadable(books, owned: Set(fetched.map(\.asin))), userInitiated: false) }
+                if downloads.automaticallyDownload { downloads.enqueue(LibraryJobs.downloadable(books, owned: Set(catalog.map(\.asin))), userInitiated: false) }
                 if UserDefaults.standard.bool(forKey: Prefs.autoConvert) { convertAll(automatic: true) }
             } catch let error where error is CancellationError || Task.isCancelled {
             } catch {

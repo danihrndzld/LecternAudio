@@ -10,7 +10,9 @@ public enum AudibleLibrary {
 
     public typealias Send = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 
-    public static func request(page: Int, pageSize: Int, marketplace: Marketplace) -> URLRequest {
+    /// `purchasedAfter` limits the list to books bought since then, sent in UTC with microseconds
+    /// ("2026-10-01T00:00:00.000000Z"), the format audible-cli sends (`strftime("%Y-%m-%dT%H:%M:%S.%fZ")`).
+    public static func request(page: Int, pageSize: Int, marketplace: Marketplace, purchasedAfter: Date? = nil) -> URLRequest {
         var c = URLComponents(url: marketplace.audibleAPI.appendingPathComponent("1.0/library"), resolvingAgainstBaseURL: false)!
         c.queryItems = [
             URLQueryItem(name: "response_groups", value: responseGroups),
@@ -18,17 +20,24 @@ public enum AudibleLibrary {
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "sort_by", value: "PurchaseDate"),
         ]
+        if let purchasedAfter {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(identifier: "UTC")
+            f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'"
+            c.queryItems?.append(URLQueryItem(name: "purchased_after", value: f.string(from: purchasedAfter)))
+        }
         return URLRequest(url: c.url!)
     }
 
     /// Fetches every page until a short one. Each page is tried up to 3 times with doubling delays.
-    public static func fetch(account: AudibleAccount, pageSize: Int = 100, retryDelay: Duration = .seconds(1),
+    public static func fetch(account: AudibleAccount, pageSize: Int = 100, retryDelay: Duration = .seconds(1), purchasedAfter: Date? = nil,
                              send: Send, progress: @Sendable (Int) -> Void = { _ in }) async throws -> [Book] {
         var books: [Book] = []
         // Pages shift if a purchase lands mid-sync; keep each ASIN's first occurrence.
         var seen = Set<String>()
         for page in 1... {
-            var request = request(page: page, pageSize: pageSize, marketplace: account.marketplace)
+            var request = request(page: page, pageSize: pageSize, marketplace: account.marketplace, purchasedAfter: purchasedAfter)
             try account.sign(&request)
             let items: [Item] = try await withRetry(delay: retryDelay) { try await parseItems(send(request)) }
             books += items.compactMap { seen.insert($0.asin).inserted ? book(from: $0, marketplace: account.marketplace) : nil }
@@ -142,6 +151,14 @@ public enum AudibleLibrary {
             self.id = id
             self.books = books
         }
+    }
+
+    /// Folds a partial (`purchasedAfter`) fetch into the saved catalog by ASIN: fetched books replace
+    /// their saved entry in place, new ones are appended, and every other saved book is kept as is.
+    public static func merge(saved: [Book], fetched: [Book]) -> [Book] {
+        let byASIN = Dictionary(fetched.map { ($0.asin, $0) }, uniquingKeysWith: { a, _ in a })
+        let savedASINs = Set(saved.map(\.asin))
+        return saved.map { byASIN[$0.asin] ?? $0 } + fetched.filter { !savedASINs.contains($0.asin) }
     }
 
     /// Merges the catalogs of several accounts into one list, by ASIN.

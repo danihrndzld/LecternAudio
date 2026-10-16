@@ -234,3 +234,26 @@ private actor Log {
     #expect(library.books[0].hasPDF)
     #expect(library.pdfURL(for: library.books[0])?.path == root.appendingPathComponent("books/B0BXXXX003.pdf").resolvingSymlinksInPath().path)
 }
+
+@Test func partialFetchMergesIntoSavedCatalog() {
+    func book(_ asin: String, _ title: String) -> Book { AudibleLibrary.book(from: .init(asin: asin, title: title), marketplace: Marketplace.all[0]) }
+    var plusGone = book("B0BXXXX001", "One")
+    plusGone.unavailable = true
+    var finished = book("B0BXXXX002", "Two")
+    finished.readStatus = .finished
+    let saved = [plusGone, finished, book("B0BXXXX003", "Three")]
+
+    let merged = AudibleLibrary.merge(saved: saved, fetched: [book("B0BXXXX003", "Three, Retitled"), book("B0NEW00001", "New Purchase")])
+    #expect(merged.map(\.asin) == ["B0BXXXX001", "B0BXXXX002", "B0BXXXX003", "B0NEW00001"])
+    #expect(merged[2].title == "Three, Retitled")
+    #expect(merged[0].unavailable)
+    #expect(merged[1].readStatus == .finished)
+    #expect(AudibleLibrary.merge(saved: saved, fetched: []) == saved)
+}
+
+@Test func purchasedAfterMatchesAudibleCLI() throws {
+    let q = { (r: URLRequest) in URLComponents(url: r.url!, resolvingAgainstBaseURL: false)!.queryItems!.first { $0.name == "purchased_after" }?.value }
+    let since = Date(timeIntervalSince1970: 1_790_812_800)  // 2026-10-01 00:00:00 UTC
+    #expect(q(AudibleLibrary.request(page: 1, pageSize: 100, marketplace: Marketplace.all[0], purchasedAfter: since)) == "2026-10-01T00:00:00.000000Z")
+    #expect(q(AudibleLibrary.request(page: 1, pageSize: 100, marketplace: Marketplace.all[0])) == nil)
+}
