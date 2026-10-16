@@ -15,7 +15,8 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.3.6"
+    # Local builds only. Releases take both from the tag and the run number (scripts/release.sh).
+    MARKETING_VERSION: "0.0.0-dev"
     CURRENT_PROJECT_VERSION: "1"
     # Sparkle appcast. Change this one line to move releases to another repo or name.
     LECTERN_FEED_URL: https://github.com/danihrndzld/LecternAudio/releases/latest/download/appcast.xml
