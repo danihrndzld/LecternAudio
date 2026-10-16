@@ -18,6 +18,14 @@ private func job(_ asin: String = "B0000001", state: DownloadJob.State) -> Downl
     }
 }
 
+// MARK: - Clear removes finished jobs only (issue #98)
+
+@Test func clearKeepsQueuedAndRunningJobs() {
+    let all: [DownloadJob.State] = [.queued, .licensing, .downloading, .converting, .complete, .failed, .cancelled]
+    let jobs = all.enumerated().map { job("B000000\($0.offset)", state: $0.element) }
+    #expect(DownloadQueue.clearingFinished(jobs).map(\.state) == [.queued, .licensing, .downloading, .converting])
+}
+
 // MARK: - Automatic downloads never revive a cancelled or failed book (issue #31)
 
 @Test func onlyUserActionsResetAFinishedJob() {

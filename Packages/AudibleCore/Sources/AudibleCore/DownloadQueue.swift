@@ -28,6 +28,11 @@ public enum DownloadQueue {
         [.licensing, .downloading, .converting].contains(state)
     }
 
+    /// The jobs the Downloads sheet's Clear keeps: queued and running ones. Complete, failed and cancelled jobs go.
+    public static func clearingFinished(_ jobs: [DownloadJob]) -> [DownloadJob] {
+        jobs.filter { $0.state == .queued || isRunning($0.state) }
+    }
+
     /// How many downloads may run at once by default: one, the serial behavior from before Settings
     /// offered more, until parallel licensing has been tried on a real account (issue #18).
     public static let defaultDownloads = 1

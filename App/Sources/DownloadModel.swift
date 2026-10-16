@@ -84,6 +84,11 @@ final class DownloadModel {
         _ = persist()
     }
 
+    func clearFinished() {
+        jobs = DownloadQueue.clearingFinished(jobs)
+        _ = persist()
+    }
+
     private func update(_ id: String, _ state: DownloadJob.State, message: String? = nil) {
         guard let index = jobs.firstIndex(where: { $0.id == id }) else { return }
         jobs[index].state = state
