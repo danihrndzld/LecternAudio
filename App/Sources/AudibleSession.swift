@@ -13,7 +13,7 @@ final class AudibleSession {
 
     /// `loadKeychain: false` starts signed out without reading the Keychain (snapshot tests and their host).
     init(loadKeychain: Bool = true) {
-        // Snapshots and perf runs stay signed out, like a fresh install.
+        // Snapshots and perf runs stay signed out, like a fresh install. 
         if !loadKeychain || Harness.env["LECTERN_SNAPSHOT"] != nil || Harness.env["LECTERN_PERF_CYCLE"] != nil { return }
         account = Keychain.load().flatMap { try? JSONDecoder().decode(AudibleAccount.self, from: $0) }
     }
