@@ -43,7 +43,7 @@ jobs:
       # No --disable-index-store here: on Linux, swift test finds tests through the index store, and a cached
       # .build without units for a new test file fails with "Failed opening .../index/store/v5/units/...".
       - run: swift test --package-path Packages/AudibleCore
-      - if: github.event_name != 'pull_request'
+      - if: github.event_name != 'pull_request' && steps.spm-linux.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: Packages/AudibleCore/.build
@@ -62,7 +62,7 @@ jobs:
           key: spm-macos-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
           restore-keys: spm-macos-
       - run: swift test --package-path Packages/AudibleCore --disable-index-store
-      - if: github.event_name != 'pull_request'
+      - if: github.event_name != 'pull_request' && steps.spm-macos.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: Packages/AudibleCore/.build
@@ -115,15 +115,45 @@ jobs:
           xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build -showBuildTimingSummary build \
             CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO | tail -80
         shell: bash -o pipefail {0}
+      # The snapshot tests can't run here and their host never takes the real launch path, which crashed in #63
+      # and #64. Launch the app with the fixture library (it is also a valid synced list) in list and grid mode,
+      # 3 times each because a timing crash can pass once. LECTERN_SNAPSHOT writes the PNG and quits.
+      - name: Launch smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/lib" "$RUNNER_TEMP/shots"
+          cp Packages/AudibleCore/Tests/AudibleCoreTests/Fixtures/books.json "$RUNNER_TEMP/lib/"
+          app="build/Build/Products/Debug/Lectern Audio.app/Contents/MacOS/Lectern Audio"
+          for mode in NO YES; do
+            for i in 1 2 3; do
+              shot="$RUNNER_TEMP/shots/shot-viewMode$mode-$i.png"
+              start=$SECONDS
+              status=0
+              # perl alarm is the timeout (no coreutils on the runner): SIGALRM, exit 142, after 60 s.
+              LECTERN_LIBRARY="$RUNNER_TEMP/lib" LECTERN_SYNCED_LIBRARY="$RUNNER_TEMP/lib/books.json" LECTERN_SNAPSHOT="$shot" \
+                perl -e 'alarm shift; exec @ARGV or die' 60 "$app" -viewMode $mode -SUEnableAutomaticChecks NO || status=$?
+              echo "viewMode $mode run $i: exit $status in $((SECONDS - start)) s"
+              if [ "$status" -ne 0 ] || [ ! -s "$shot" ]; then
+                echo "::error::Launch failed (viewMode $mode run $i, exit $status; 142 is the timeout, 134 an abort)"
+                exit 1
+              fi
+            done
+          done
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-snapshots
+          path: ${{ runner.temp }}/shots
+          if-no-files-found: ignore
       # Save keys come from the restore steps: hashFiles here would see Package.resolved after the build rewrote it.
-      - if: github.event_name != 'pull_request'
+      # Exact-key hits are skipped: the key exists, so the save fails with "Unable to reserve cache" after tarring it.
+      - if: github.event_name != 'pull_request' && steps.helpers.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
             build/ffmpeg-8.0
             build/aria2-1.37.0
           key: ${{ steps.helpers.outputs.cache-primary-key }}
-      - if: github.event_name != 'pull_request'
+      - if: github.event_name != 'pull_request' && steps.spm-xcode.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: build/SourcePackages
