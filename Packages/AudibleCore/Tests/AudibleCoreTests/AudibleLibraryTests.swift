@@ -111,7 +111,7 @@ private actor Log {
     #expect(m.key == downloaded.key)
     #expect(m.summary == downloaded.summary)
     let n = try #require(merged.first { $0.asin == "B0NEW00001" })
-    #expect(!n.hasAudio && !n.hasEncrypted)  // lands in "In Audible Only"
+    #expect(!n.hasAudio && !n.hasEncrypted)  // lands in "Not Downloaded"
     #expect(Set(merged.map(\.id)).count == merged.count)
 
     #expect(AudibleLibrary.merge(audible: [], local: local) == local)
@@ -185,7 +185,9 @@ private actor Log {
 
     var index = LibraryIndex()
     index.books = books
-    #expect(index.count(.audibleOnly) == 4)
+    #expect(index.count(.unavailable) == 2)
     #expect(index.count(.notDownloaded) == 2)
+    // Unavailable and Not Downloaded split the books with no file between them.
+    #expect(books.filter { LibraryFilter.unavailable.matches($0) != LibraryFilter.notDownloaded.matches($0) }.count == books.count)
     #expect(LibraryJobs.downloadable(books, owned: Set(books.map(\.asin))).map(\.asin) == ["B0PURCHASE", "B0PLUSLIVE"])
 }

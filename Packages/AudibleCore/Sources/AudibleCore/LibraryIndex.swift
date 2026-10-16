@@ -2,12 +2,12 @@ import Foundation
 
 /// A sidebar entry: which books the library list shows.
 public enum LibraryFilter: Hashable, Sendable {
-    case all, downloaded, notDownloaded, notConverted, audibleOnly, reading, finished, pdfs
+    case all, downloaded, notDownloaded, notConverted, unavailable, reading, finished, pdfs
     case genre(String)
     /// Books owned by one account, by `AudibleAccount.storageID` (issue #47).
     case account(String)
 
-    public static let fixed: [LibraryFilter] = [.all, .downloaded, .notDownloaded, .notConverted, .audibleOnly, .reading, .finished, .pdfs]
+    public static let fixed: [LibraryFilter] = [.all, .downloaded, .notDownloaded, .notConverted, .unavailable, .reading, .finished, .pdfs]
 
     public var title: String {
         switch self {
@@ -15,7 +15,7 @@ public enum LibraryFilter: Hashable, Sendable {
         case .downloaded: "Downloaded"
         case .notDownloaded: "Not Downloaded"
         case .notConverted: "Not Converted"
-        case .audibleOnly: "In Audible Only"
+        case .unavailable: "Unavailable"
         case .reading: "Listening"
         case .finished: "Finished"
         case .pdfs: "With PDF"
@@ -30,8 +30,8 @@ public enum LibraryFilter: Hashable, Sendable {
         case .all: true
         case .downloaded: b.hasAudio
         case .notConverted: b.hasEncrypted && !b.hasAudio
-        case .audibleOnly: !b.hasEncrypted && !b.hasAudio
-        // In Audible Only minus the books Audible no longer lets this account download.
+        // Books with no file split into these two: Audible no longer lets this account download the first.
+        case .unavailable: !b.hasEncrypted && !b.hasAudio && b.unavailable
         case .notDownloaded: !b.hasEncrypted && !b.hasAudio && !b.unavailable
         case .reading: b.readStatus == .reading
         case .finished: b.readStatus == .finished

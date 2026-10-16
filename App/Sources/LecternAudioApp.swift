@@ -123,14 +123,14 @@ enum BodyCount {
 }
 
 extension LibraryFilter {
-    /// `LECTERN_PERF_FROM` names: all, downloaded, notDownloaded, notConverted, audibleOnly, reading, finished, pdfs, genre:<name>.
+    /// `LECTERN_PERF_FROM` names: all, downloaded, notDownloaded, notConverted, unavailable, reading, finished, pdfs, genre:<name>.
     fileprivate init?(perfName: Substring) {
         switch perfName {
         case "all": self = .all
         case "downloaded": self = .downloaded
         case "notDownloaded": self = .notDownloaded
         case "notConverted": self = .notConverted
-        case "audibleOnly": self = .audibleOnly
+        case "unavailable": self = .unavailable
         case "reading": self = .reading
         case "finished": self = .finished
         case "pdfs": self = .pdfs

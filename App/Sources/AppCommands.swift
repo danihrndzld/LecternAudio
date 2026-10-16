@@ -214,7 +214,7 @@ private struct ViewCommands: Commands {
             Button("Reset Sort") { library.sortOrder = BookComparator.defaultOrder }
                 .disabled(library.sortOrder == BookComparator.defaultOrder)
             Picker("Filter By", selection: Binding(get: { library.filter }, set: { library.filter = $0 })) {
-                ForEach([LibraryFilter.all, .reading, .finished, .downloaded, .notDownloaded, .notConverted, .audibleOnly, .pdfs], id: \.self) {
+                ForEach([LibraryFilter.all, .reading, .finished, .downloaded, .notDownloaded, .notConverted, .unavailable, .pdfs], id: \.self) {
                     Text($0.title).tag($0)
                 }
                 if !library.genres.isEmpty {
