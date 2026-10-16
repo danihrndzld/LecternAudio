@@ -24,19 +24,27 @@ jobs:
       - run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Tag must look like v1.2.3, got $TAG"; exit 1; }
           git checkout "refs/tags/$TAG"
-      # Saved by ci.yml on pushes to main (arm64, the runner's architecture). A tag can't reuse caches saved on another tag.
+      # Saved by the ci.yml run that automerge dispatches on main after each merge (arm64, the runner's architecture). A tag can't reuse caches saved on another tag.
       - uses: actions/cache/restore@v4
         with:
           path: |
             build/ffmpeg-8.0
             build/aria2-1.37.0
           key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
+      - id: sparkle
+        run: |
+          echo "version=$(grep -A3 '^  Sparkle:' project.yml | sed -n 's/.*exactVersion: *"\(.*\)"/\1/p')" >> "$GITHUB_OUTPUT"
       - uses: actions/cache/restore@v4
         with:
           path: build/SourcePackages
-          key: spm-xcode-${{ hashFiles('project.yml', 'Packages/AudibleCore/Package.resolved') }}
+          key: spm-xcode-sparkle${{ steps.sparkle.outputs.version }}-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
           restore-keys: spm-xcode-
-      - run: brew install xcodegen
+      - name: Install XcodeGen
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 --check
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
       - run: xcodegen generate
       # A certificate gives every version the same designated requirement, so the Keychain's "Always Allow"
       # for the Audible sign-in survives updates. An ad-hoc signature's requirement is its cdhash, which
