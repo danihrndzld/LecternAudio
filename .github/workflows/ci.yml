@@ -80,7 +80,7 @@ jobs:
             build/aria2-1.37.0
           key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
       # Products, module caches and object files of the last main build, plus package checkouts and the Sparkle
-      # binary (build/SourcePackages) and the SwiftPM manifest cache, in one archive. Package sources keep their
+      # binary (build/SourcePackages), in one archive. Package sources keep their
       # cached mtimes, so their objects (BoringSSL, most of the C compile) are reused; the checkout's files
       # rebuild. release.yml restores this same path list.
       - id: dd
