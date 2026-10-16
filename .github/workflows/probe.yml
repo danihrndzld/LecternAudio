@@ -1,0 +1,210 @@
+name: Probe
+on:
+  pull_request:
+jobs:
+  # Where does macos-test spend its time? Same cache and command as ci.yml, with each phase timed.
+  spm:
+    runs-on: macos-26
+    env:
+      PKG: Packages/AudibleCore
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain first launch
+        run: |
+          echo "ImageVersion=$ImageVersion"
+          time swift --version
+          time xcrun --find swift
+          time xcrun --find xctest
+          time xcrun --show-sdk-path
+          time swift --version
+      - id: spm-macos
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            Packages/AudibleCore/.build
+            ~/Library/Caches/org.swift.swiftpm/manifests
+          key: spm-macos-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
+          restore-keys: spm-macos-
+      - name: Inspect the restored state
+        run: |
+          cd "$PKG"
+          find .build -maxdepth 1 -exec stat -f '%m %N' {} +
+          find .build/arm64-apple-macosx/debug -maxdepth 1 -exec stat -f '%m %N' {} + | head -60
+          head -c 1500 .build/workspace-state.json; echo
+          ls -la ~/Library/Caches/org.swift.swiftpm/manifests/ || true
+          stat -f '%m %i %z %N' Package.swift .build/checkouts/swift-crypto/Package.swift \
+            .build/checkouts/swift-crypto/Sources/CCryptoBoringSSL/crypto/err/err_data.cc \
+            .build/arm64-apple-macosx/debug/CCryptoBoringSSL.build/crypto/err/err_data.cc.o \
+            .build/arm64-apple-macosx/debug/build.db \
+            "$(xcrun --show-sdk-path)/usr/include/stdio.h" || true
+          find .build -name '*.o' -exec stat -f '%m %i %N' {} + | sort -k3 > "$RUNNER_TEMP/o-0.txt"; wc -l "$RUNNER_TEMP/o-0.txt"
+      - name: swift package resolve (timed, very verbose)
+        run: |
+          cd "$PKG"
+          time swift package resolve -vv 2>&1 | perl -MTime::HiRes=time -pe 'BEGIN{$t=time} printf "%7.2f ", time-$t' | tee "$RUNNER_TEMP/resolve.log" | tail -40
+          echo "lines: $(wc -l < "$RUNNER_TEMP/resolve.log")"
+      - name: swift package describe (manifest load only, timed)
+        run: cd "$PKG" && time swift package describe --type json > /dev/null
+      - name: swift build --build-tests (restored cache, timed)
+        run: |
+          cd "$PKG"
+          time swift build --build-tests --disable-index-store 2>&1 | perl -MTime::HiRes=time -pe 'BEGIN{$t=time} printf "%7.2f ", time-$t' > "$RUNNER_TEMP/build1.log"
+          head -5 "$RUNNER_TEMP/build1.log"; echo ...; tail -4 "$RUNNER_TEMP/build1.log"
+          echo "compile lines: $(grep -c Compiling "$RUNNER_TEMP/build1.log")  C/C++: $(grep -cE 'Compiling .*\.(c|cc|S)$' "$RUNNER_TEMP/build1.log")"
+          find .build -name '*.o' -exec stat -f '%m %i %N' {} + | sort -k3 > "$RUNNER_TEMP/o-1.txt"
+          echo "objects rewritten: $(diff "$RUNNER_TEMP/o-0.txt" "$RUNNER_TEMP/o-1.txt" | grep -c '^>') of $(wc -l < "$RUNNER_TEMP/o-1.txt")"
+      - name: swift build again (no-op, timed)
+        run: cd "$PKG" && time swift build --build-tests --disable-index-store 2>&1 | tail -3
+      - name: swift test --skip-build (timed)
+        run: cd "$PKG" && time swift test --skip-build --disable-index-store 2>&1 | tail -3
+      # Same machine, same files, same mtimes, new inodes: what does a tar round trip of .build cost?
+      - name: Tar round trip of .build, then build again (timed)
+        run: |
+          cd "$PKG"
+          gtar --posix -cf "$RUNNER_TEMP/build.tar" .build
+          mv .build "$RUNNER_TEMP/build-old"
+          gtar -xf "$RUNNER_TEMP/build.tar" -P --delay-directory-restore
+          stat -f '%m %i %z %N' .build/checkouts/swift-crypto/Sources/CCryptoBoringSSL/crypto/err/err_data.cc \
+            .build/arm64-apple-macosx/debug/CCryptoBoringSSL.build/crypto/err/err_data.cc.o
+          find .build -name '*.o' -exec stat -f '%m %i %N' {} + | sort -k3 > "$RUNNER_TEMP/o-2.txt"
+          time swift build --build-tests --disable-index-store 2>&1 | perl -MTime::HiRes=time -pe 'BEGIN{$t=time} printf "%7.2f ", time-$t' > "$RUNNER_TEMP/build3.log"
+          head -3 "$RUNNER_TEMP/build3.log"; echo ...; tail -3 "$RUNNER_TEMP/build3.log"
+          echo "compile lines: $(grep -c Compiling "$RUNNER_TEMP/build3.log")  C/C++: $(grep -cE 'Compiling .*\.(c|cc|S)$' "$RUNNER_TEMP/build3.log")"
+          find .build -name '*.o' -exec stat -f '%m %i %N' {} + | sort -k3 > "$RUNNER_TEMP/o-3.txt"
+          echo "objects rewritten: $(diff "$RUNNER_TEMP/o-2.txt" "$RUNNER_TEMP/o-3.txt" | grep -c '^>') of $(wc -l < "$RUNNER_TEMP/o-3.txt")"
+      # Touch the checkout's sources (what a fresh git checkout does), keep the restored .build: what rebuilds?
+      - name: Touch own sources, build again (timed)
+        run: |
+          cd "$PKG"
+          find Sources Tests -type f -exec touch {} +
+          time swift build --build-tests --disable-index-store > "$RUNNER_TEMP/build4.log" 2>&1
+          echo "compile lines: $(grep -c Compiling "$RUNNER_TEMP/build4.log")  C/C++: $(grep -cE 'Compiling .*\.(c|cc|S)$' "$RUNNER_TEMP/build4.log")"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spm-logs
+          path: ${{ runner.temp }}/*.log
+  # Swift Build as SwiftPM's build system: does its .build survive a tar round trip?
+  swiftbuild:
+    runs-on: macos-26
+    env:
+      PKG: Packages/AudibleCore
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cold build with --build-system swiftbuild (timed)
+        run: |
+          cd "$PKG"
+          time swift build --build-tests --build-system swiftbuild 2>&1 | tail -5
+          ls .build
+      - name: swift test --skip-build (timed)
+        run: cd "$PKG" && time swift test --skip-build --build-system swiftbuild 2>&1 | tail -3
+      - name: Build again (no-op, timed)
+        run: cd "$PKG" && time swift build --build-tests --build-system swiftbuild 2>&1 | tail -3
+      - name: Tar round trip, build again (timed)
+        run: |
+          cd "$PKG"
+          gtar --posix -cf "$RUNNER_TEMP/build.tar" .build
+          mv .build "$RUNNER_TEMP/build-old"
+          gtar -xf "$RUNNER_TEMP/build.tar" -P --delay-directory-restore
+          time swift build --build-tests --build-system swiftbuild 2>&1 | tail -5
+      - name: Touch own sources, build again (timed)
+        run: |
+          cd "$PKG"
+          find Sources Tests -type f -exec touch {} +
+          time swift build --build-tests --build-system swiftbuild 2>&1 | tail -5
+  # The package tests through xcodebuild from the app's DerivedData: one build-for-testing, then test-without-building.
+  xcodebuild:
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [test, build-for-testing]
+    steps:
+      - uses: actions/checkout@v4
+      - id: helpers
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/ffmpeg-8.0
+            build/aria2-1.37.0
+          key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
+      - id: dd
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/Build
+            build/ModuleCache.noindex
+            build/SDKExplicitPrecompiledModules
+            build/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm/manifests
+          key: dd-macos-${{ github.sha }}
+          restore-keys: dd-macos-
+      - name: Install XcodeGen
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 --check
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+      - run: xcodegen generate
+      - name: xcodebuild build (one step, resolution inside, timed)
+        if: matrix.mode == 'test'
+        run: |
+          time xcodebuild -scheme LecternAudio -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
+            -showBuildTimingSummary build CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+            | perl -MTime::HiRes=time -pe 'BEGIN{$t=time} printf "%7.2f ", time-$t' | tee "$RUNNER_TEMP/xcodebuild.log" | awk 'NR <= 12 { print; fflush() }' || status=$?
+          echo ...
+          grep -E 'Resolve|Resolved|Build Timing|tasks\)|BUILD' "$RUNNER_TEMP/xcodebuild.log" | head -40
+          exit "${status:-0}"
+        shell: bash -o pipefail {0}
+      - name: xcodebuild test -scheme AudibleCoreTests (timed)
+        if: matrix.mode == 'test'
+        run: |
+          time xcodebuild test -scheme AudibleCoreTests -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
+            -showBuildTimingSummary CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+            | perl -MTime::HiRes=time -pe 'BEGIN{$t=time} printf "%7.2f ", time-$t' | tee "$RUNNER_TEMP/xcodebuild-test.log" | awk 'NR <= 12 { print; fflush() }' || status=$?
+          echo ...
+          grep -E 'Resolve|Resolved|Build Timing|tasks\)|BUILD|TEST|Test Suite|Executed|passed after|failed' "$RUNNER_TEMP/xcodebuild-test.log" | head -60
+          exit "${status:-0}"
+        shell: bash -o pipefail {0}
+      - name: xcodebuild build-for-testing -scheme AudibleCoreTests (app + tests in one build, timed)
+        if: matrix.mode == 'build-for-testing'
+        run: |
+          time xcodebuild build-for-testing -scheme AudibleCoreTests -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
+            -showBuildTimingSummary CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+            | perl -MTime::HiRes=time -pe 'BEGIN{$t=time} printf "%7.2f ", time-$t' | tee "$RUNNER_TEMP/xcodebuild.log" | awk 'NR <= 12 { print; fflush() }' || status=$?
+          echo ...
+          grep -E 'Resolve|Resolved|Build Timing|tasks\)|BUILD' "$RUNNER_TEMP/xcodebuild.log" | head -40
+          exit "${status:-0}"
+        shell: bash -o pipefail {0}
+      - name: xcodebuild test-without-building -scheme AudibleCoreTests (timed)
+        if: matrix.mode == 'build-for-testing'
+        run: |
+          time xcodebuild test-without-building -scheme AudibleCoreTests -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+            | perl -MTime::HiRes=time -pe 'BEGIN{$t=time} printf "%7.2f ", time-$t' | tee "$RUNNER_TEMP/xcodebuild-test.log" | awk 'NR <= 12 { print; fflush() }' || status=$?
+          echo ...
+          grep -E 'TEST|Test Suite|Executed|passed after|failed' "$RUNNER_TEMP/xcodebuild-test.log" | head -40
+          exit "${status:-0}"
+        shell: bash -o pipefail {0}
+      - name: Launch smoke test
+        run: |
+          mkdir -p "$RUNNER_TEMP/lib" "$RUNNER_TEMP/shots"
+          cp Packages/AudibleCore/Tests/AudibleCoreTests/Fixtures/books.json "$RUNNER_TEMP/lib/"
+          app="build/Build/Products/Debug/Lectern Audio.app/Contents/MacOS/Lectern Audio"
+          for mode in NO YES; do
+            shot="$RUNNER_TEMP/shots/shot-viewMode$mode.png"
+            start=$SECONDS
+            status=0
+            LECTERN_LIBRARY="$RUNNER_TEMP/lib" LECTERN_SYNCED_LIBRARY="$RUNNER_TEMP/lib/books.json" LECTERN_SNAPSHOT="$shot" \
+              perl -e 'alarm shift; exec @ARGV or die' 60 "$app" -viewMode $mode -SUEnableAutomaticChecks NO || status=$?
+            echo "viewMode $mode: exit $status in $((SECONDS - start)) s"
+            if [ "$status" -ne 0 ] || [ ! -s "$shot" ]; then
+              echo "::error::Launch failed (viewMode $mode, exit $status)"
+              exit 1
+            fi
+          done
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-logs-${{ matrix.mode }}
+          path: ${{ runner.temp }}/*.log

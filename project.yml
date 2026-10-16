@@ -101,3 +101,11 @@ schemes:
         LecternAudioTests: [test]
     test:
       targets: [LecternAudioTests]
+  # The AudibleCore package tests, run by CI with xcodebuild from the app's DerivedData (no separate SwiftPM build).
+  AudibleCoreTests:
+    build:
+      targets:
+        LecternAudio: [test]
+    test:
+      targets:
+        - package: AudibleCore/AudibleCoreTests
