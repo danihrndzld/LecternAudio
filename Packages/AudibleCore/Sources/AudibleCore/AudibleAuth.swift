@@ -109,7 +109,7 @@ public struct SignIn: Sendable {
             .first { $0.name == "openid.oa2.authorization_code" }?.value.flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    public func registerRequest(code: String) -> URLRequest {
+    public func registerRequest(code: String) throws -> URLRequest {
         let body: [String: Any] = [
             "requested_token_type": ["bearer", "mac_dms", "website_cookies", "store_authentication_cookie"],
             "cookies": ["website_cookies": [Any](), "domain": ".amazon.\(marketplace.domain)"],
@@ -136,7 +136,7 @@ public struct SignIn: Sendable {
         var r = URLRequest(url: marketplace.amazonAPI.appendingPathComponent("auth/register"))
         r.httpMethod = "POST"
         r.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        r.httpBody = try! JSONSerialization.data(withJSONObject: body)
+        r.httpBody = try JSONSerialization.data(withJSONObject: body)
         return r
     }
 

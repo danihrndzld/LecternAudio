@@ -151,7 +151,7 @@ extension Book: Codable {
         if hasCompanionPDF { try c.encode(true, forKey: .hasCompanionPDF) }
     }
 
-    nonisolated(unsafe) static let day: DateFormatter = {
+    static let day: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = .current  // calendar dates: midnight local so they display as written
