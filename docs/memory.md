@@ -82,9 +82,8 @@ An unsandboxed Debug build made with `CODE_SIGN_ENTITLEMENTS=` also dropped `dis
 
 ## Build, signing and release
 
-- The app is ad-hoc signed, so Release builds need `com.apple.security.cs.disable-library-validation` to load Sparkle.framework, and Sparkle trusts updates through the EdDSA signature only. A Sparkle installed update has no quarantine attribute and launches without a Gatekeeper prompt, but the first manual install needs Open Anyway or `xattr -dr com.apple.quarantine`.
+- Local builds are ad-hoc signed, and releases from 0.3.3 on are signed with the owner's Apple Development certificate (PR #69), not a Developer ID, so neither is notarized. Builds need `com.apple.security.cs.disable-library-validation` to load Sparkle.framework, and Sparkle trusts updates through the EdDSA signature only. A Sparkle installed update has no quarantine attribute and launches without a Gatekeeper prompt, but the first manual install needs Open Anyway or `xattr -dr com.apple.quarantine`.
 - Bundled helpers (`ffmpeg`, `aria2c`) carry `app-sandbox` and `inherit` entitlements and must be signed inside out before the app. Run alone, they exit at sandbox init with SIGTRAP, which is expected.
-- While the repository is private, `releases/latest/download/appcast.xml` returns 404 to the app, so updates reach nobody.
 - Renaming the bundle ID gives the app a new sandbox container, so the folder choice, settings and the Audible sign-in must be set up again. Files the app wrote into the user's OpenAudible folder keep their old names (`books/Earmark/`, `earmark-conversions.json`) so they are still found.
 - After the rename, a stale generated `Earmark.xcodeproj` made `xcodebuild` refuse to run. Delete old generated projects.
 
@@ -94,6 +93,7 @@ An unsandboxed Debug build made with `CODE_SIGN_ENTITLEMENTS=` also dropped `dis
 - Automerge pins the merge to the commit CI tested with `--match-head-commit`, and it skips PRs that touch `.github/` so an agent cannot weaken its own checks (PR #30).
 - `xcrun xctrace record --launch` resolved the app by name and started the installed copy in `/Applications` instead of the agent's build, and those stray copies kept running. Record with `--all-processes`, and quit every process you start.
 - Agents must work in their own worktree. The owner's checkout once held important uncommitted work, and another session edited it live.
+- CI caches (the FFmpeg and aria2 builds, package checkouts and builds, DerivedData) are saved only by the main CI run that automerge dispatches after each merge (PR #83), because a merge with `GITHUB_TOKEN` fires no push event; PR runs only restore them.
 - Running `swift test` rewrites `Package.resolved` with a Sparkle pin. Don't commit that change by accident.
 - The CI runner uses Xcode 26, which failed to compile a large `ContentView` body that Xcode 27 compiled (PR #26). The log was cut off, so the cause is probably type checking time. Splitting the body into helper functions fixed it, so keep view bodies small.
 
