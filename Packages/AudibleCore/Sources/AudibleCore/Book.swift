@@ -80,6 +80,8 @@ public struct Book: Identifiable, Hashable, Sendable {
     /// An Audible Plus title this account can no longer listen to: the book left the Plus catalog or the
     /// membership ended. Audible keeps it in the library but denies its download license.
     public var unavailable = false
+    /// Audible lists a companion PDF for this book (the library's `pdf_url`). The PDF is fetched with the download.
+    public var hasCompanionPDF = false
 
     public var hasAudio: Bool { files.contains { [.m4b, .mp3].contains($0.type) } }
     public var hasEncrypted: Bool { files.contains { [.aax, .aaxc].contains($0.type) } }
@@ -95,6 +97,8 @@ extension Book: Codable {
         case releaseDate = "release_date", purchaseDate = "purchase_date", readStatus = "read_status", imageURL = "image_url"
         // Not an OpenAudible field. Written only when true, so books.json keeps OpenAudible's shape.
         case unavailable
+        // Not an OpenAudible field either; written only when true.
+        case hasCompanionPDF = "companion_pdf"
     }
 
     public init(from decoder: Decoder) throws {
@@ -119,6 +123,7 @@ extension Book: Codable {
         chapters = (try? c.decode([Chapter].self, forKey: .chapters)) ?? []
         files = (try? c.decode([BookFile].self, forKey: .files)) ?? []
         unavailable = (try? c.decode(Bool.self, forKey: .unavailable)) ?? false
+        hasCompanionPDF = (try? c.decode(Bool.self, forKey: .hasCompanionPDF)) ?? false
     }
 
     /// Writes the same books.json shape the decoder reads (Lectern Audio's library.json).
@@ -143,6 +148,7 @@ extension Book: Codable {
         try c.encode(chapters, forKey: .chapters)
         try c.encode(files, forKey: .files)
         if unavailable { try c.encode(true, forKey: .unavailable) }
+        if hasCompanionPDF { try c.encode(true, forKey: .hasCompanionPDF) }
     }
 
     nonisolated(unsafe) static let day: DateFormatter = {

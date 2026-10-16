@@ -141,6 +141,18 @@ public enum AudibleContent {
         url.scheme == "https" && url.host != nil && url.user == nil && url.password == nil
     }
 
+    /// The request a download transport follows on a redirect, or nil to stop it. The next hop is a CDN, so it
+    /// carries no account headers or cookies (a signed `companion-file` request 302s to one).
+    public static func cdnRedirect(_ request: URLRequest) -> URLRequest? {
+        guard let url = request.url, validDownloadURL(url) else { return nil }
+        var redirected = request
+        redirected.httpShouldHandleCookies = false
+        for field in ["Authorization", "Cookie", "x-adp-token", "x-adp-alg", "x-adp-signature", "x-amz-access-token"] {
+            redirected.setValue(nil, forHTTPHeaderField: field)
+        }
+        return redirected
+    }
+
     public static func checkResponse(_ response: URLResponse) throws {
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0

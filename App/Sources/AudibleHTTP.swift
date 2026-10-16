@@ -28,13 +28,7 @@ final class DownloadRedirects: NSObject, URLSessionTaskDelegate {
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask,
                                willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                                completionHandler: @escaping (URLRequest?) -> Void) {
-        guard let url = request.url, AudibleContent.validDownloadURL(url) else { completionHandler(nil); return }
-        var redirected = request
-        redirected.httpShouldHandleCookies = false
-        for field in ["Authorization", "Cookie", "x-adp-token", "x-adp-signature", "x-amz-access-token"] {
-            redirected.setValue(nil, forHTTPHeaderField: field)
-        }
-        completionHandler(redirected)
+        completionHandler(AudibleContent.cdnRedirect(request))
     }
 }
 

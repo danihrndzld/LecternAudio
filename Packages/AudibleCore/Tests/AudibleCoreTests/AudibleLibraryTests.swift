@@ -191,3 +191,46 @@ private actor Log {
     #expect(books.filter { LibraryFilter.unavailable.matches($0) != LibraryFilter.notDownloaded.matches($0) }.count == books.count)
     #expect(LibraryJobs.downloadable(books, owned: Set(books.map(\.asin))).map(\.asin) == ["B0PURCHASE", "B0PLUSLIVE"])
 }
+
+@Test func companionPDFIsFlaggedSavedAndRequestedSigned() throws {
+    let json = #"""
+    {"items": [
+      {"asin": "B0BXXXX001", "pdf_url": null},
+      {"asin": "B0BXXXX002"},
+      {"asin": "B0BXXXX003", "pdf_url": "https://www.audible.com/companion-file/B0BXXXX003"}
+    ]}
+    """#
+    let items = try JSONDecoder().decode(AudibleLibrary.Page.self, from: Data(json.utf8)).items
+    let books = items.map { AudibleLibrary.book(from: $0, marketplace: Marketplace.all[0]) }
+    #expect(books.map(\.hasCompanionPDF) == [false, false, true])
+
+    // Saved only when true, so queue.json and library.json written before it still decode.
+    let saved = try JSONDecoder().decode([Book].self, from: JSONEncoder().encode(books))
+    #expect(saved.map(\.hasCompanionPDF) == [false, false, true])
+    #expect(try !String(decoding: JSONEncoder().encode(books[0]), as: UTF8.self).contains("companion_pdf"))
+
+    let account = try testAccount()
+    let request = try AudibleLibrary.companionPDFRequest(asin: "B0BXXXX003", account: account)
+    #expect(request.url?.absoluteString == "https://www.audible.\(account.marketplace.domain)/companion-file/B0BXXXX003")
+    #expect(request.value(forHTTPHeaderField: "x-adp-signature") != nil)
+    #expect(request.value(forHTTPHeaderField: "Accept") == "*/*")
+    #expect(throws: AudibleError.self) { try AudibleLibrary.companionPDFRequest(asin: "../x", account: account) }
+
+    #expect(AudibleLibrary.isPDF(Data("%PDF-1.7\n".utf8)))
+    #expect(!AudibleLibrary.isPDF(Data("<html>".utf8)))
+    #expect(!AudibleLibrary.isPDF(Data()))
+}
+
+@Test func downloadedPDFIsFoundBesideTheBook() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("books"), withIntermediateDirectories: true)
+    try Data("%PDF".utf8).write(to: root.appendingPathComponent("books/B0BXXXX003.pdf"))
+    var book = Book(key: "k", title: "T", author: "A", seconds: 1, files: [BookFile(path: "B0BXXXX003.m4b", type: .m4b)])
+    book.asin = "B0BXXXX003"
+    book.files.append(BookFile(path: "B0BXXXX003.pdf", type: .pdf))
+    try AudibleLibrary.save([book], to: root.appendingPathComponent("books.json"))
+    let library = try OpenAudibleLibrary(root: root)
+    #expect(library.books[0].hasPDF)
+    #expect(library.pdfURL(for: library.books[0])?.path == root.appendingPathComponent("books/B0BXXXX003.pdf").resolvingSymlinksInPath().path)
+}
