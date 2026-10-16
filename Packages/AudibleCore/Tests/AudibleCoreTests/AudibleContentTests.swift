@@ -222,3 +222,15 @@ private func registeredAccount() throws -> AudibleAccount {
     #expect(body["consumption_type"] as? String == "Download")
     #expect(throws: AudibleError.self) { try AudibleContent.licenseRequest(asin: "../OTHER", account: account) }
 }
+
+@Test func cdnRedirectDropsAccountHeadersAndCookies() throws {
+    var request = URLRequest(url: URL(string: "https://cdn.example.com/file.pdf")!)
+    for field in ["Authorization", "Cookie", "X-ADP-Token", "x-adp-alg", "x-adp-signature", "x-amz-access-token"] {
+        request.setValue("secret", forHTTPHeaderField: field)
+    }
+    request.setValue("*/*", forHTTPHeaderField: "Accept")
+    let redirected = try #require(AudibleContent.cdnRedirect(request))
+    #expect(redirected.allHTTPHeaderFields == ["Accept": "*/*"])
+    #expect(!redirected.httpShouldHandleCookies)
+    #expect(AudibleContent.cdnRedirect(URLRequest(url: URL(string: "http://cdn.example.com/file.pdf")!)) == nil)
+}

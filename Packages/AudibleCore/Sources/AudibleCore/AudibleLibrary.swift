@@ -84,6 +84,7 @@ public enum AudibleLibrary {
         struct Plan: Decodable { var plan_name: String? }
         var is_ayce: Bool?
         var plans: [Plan]?
+        var pdf_url: String?
 
         /// Added with Audible Plus and no Plus or free plan covers it now, so Audible denies its license.
         /// Libation's rule (`LibraryBookImporter.isPlusTitleUnavailable`, plan names from AudibleApi's `Plan.IsAyce`).
@@ -114,8 +115,23 @@ public enum AudibleLibrary {
             imageURL: item.product_images?["500"].flatMap(URL.init(string:)),
             chapters: [], files: [])
         book.unavailable = item.unavailable
+        book.hasCompanionPDF = item.pdf_url?.isEmpty == false
         return book
     }
+
+    /// The signed request for a book's companion PDF. Like audible-cli's `get_pdf_url`, it ignores the
+    /// value of `pdf_url` and asks `www.audible.<domain>/companion-file/<asin>`, which redirects to the file.
+    public static func companionPDFRequest(asin: String, account: AudibleAccount) throws -> URLRequest {
+        guard AudibleContent.validASIN(asin) else { throw AudibleError("Invalid Audible book identifier.") }
+        var request = URLRequest(url: URL(string: "https://www.audible.\(account.marketplace.domain)/companion-file/\(asin)")!)
+        try account.sign(&request)
+        // `sign` asks for JSON; the signature doesn't cover Accept.
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        return request
+    }
+
+    /// True when `data` starts like a PDF, not an HTML or JSON error page.
+    public static func isPDF(_ data: Data) -> Bool { data.starts(with: Data("%PDF".utf8)) }
 
     /// One signed-in account's synced catalog.
     public struct AccountCatalog: Sendable {

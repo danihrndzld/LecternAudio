@@ -33,7 +33,7 @@ Lectern Audio is for personal use with books you bought. It isn't affiliated wit
 
 - **See your whole library.** Browse your books in a table or in a grid of covers, filter them by status, file type, or genre, and search by title, author, or narrator.
 - **Sync with Audible.** Sign in on Amazon's own page, and Lectern Audio lists every book in your account, including the ones you haven't downloaded.
-- **Download and convert.** Select one book or many, right click, and choose Download and Convert. Lectern Audio downloads them one after the other and saves each one as an M4B file with chapters and cover art.
+- **Download and convert.** Select one book or many, right click, and choose Download and Convert. Lectern Audio downloads them one after the other and saves each one as an M4B file with chapters and cover art, plus the book's companion PDF when Audible has one.
 - **Listen.** Play M4B and MP3 files with chapters, playback speed, and a saved position for each book. The keyboard, the Player menu, and the macOS Now Playing widget all control playback.
 - **Export.** Save a book as MP3 (320 kbps by default) or Ogg Vorbis, as one file or as one file per chapter, with tags, chapters, and cover art. You can also export the library list to Excel, CSV, or JSON.
 - **Bring your own files.** Import M4B and MP3 files you already have, and join several audio files into one M4B.

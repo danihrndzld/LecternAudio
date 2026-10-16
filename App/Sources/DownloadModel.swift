@@ -209,6 +209,31 @@ final class DownloadModel {
                         }
                     }
                 }
+                // The companion PDF is optional: any failure is logged and the audio job goes on.
+                // Saved where OpenAudibleLibrary.pdfURL(for:) finds it; `transport` strips the signing headers when
+                // companion-file redirects to the CDN (AudibleContent.cdnRedirect).
+                let pdf = output.deletingPathExtension().appendingPathExtension("pdf")
+                if book.hasCompanionPDF, AudibleContent.validASIN(book.asin), !FileManager.default.fileExists(atPath: pdf.path) {
+                    var saved = false
+                    if var request = try? AudibleLibrary.companionPDFRequest(asin: book.asin, account: account) {
+                        request.timeoutInterval = 60
+                        request.httpShouldHandleCookies = false
+                        if let (temporary, response) = try? await transport.download(for: request) {
+                            defer { try? FileManager.default.removeItem(at: temporary) }
+                            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                            let head = try? FileHandle(forReadingFrom: temporary).read(upToCount: 4)
+                            if status == 200, AudibleLibrary.isPDF(head ?? Data()) {
+                                saved = (try? FileManager.default.createDirectory(at: pdf.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil
+                                    && (try? FileManager.default.moveItem(at: temporary, to: pdf)) != nil
+                            } else {
+                                AppLog.shared.error("No companion PDF for \(book.asin): HTTP \(status)\(status == 200 ? ", not a PDF" : "")")
+                            }
+                        } else {
+                            AppLog.shared.error("Could not download the companion PDF for \(book.asin)")
+                        }
+                    }
+                    if saved { AppLog.shared.info("Saved the companion PDF for \(book.asin)") }
+                }
                 try Task.checkCancellation()
                 update(job.id, .converting)
                 progress[job.id] = 0

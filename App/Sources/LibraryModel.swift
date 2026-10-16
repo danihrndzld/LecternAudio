@@ -274,6 +274,8 @@ final class LibraryModel {
             ? try JSONDecoder().decode([Book].self, from: Data(contentsOf: index)) : []
         var local = book
         local.files = [BookFile(path: output.lastPathComponent, type: .m4b)]
+        let pdf = output.deletingPathExtension().appendingPathExtension("pdf")
+        if FileManager.default.fileExists(atPath: pdf.path) { local.files.append(BookFile(path: pdf.lastPathComponent, type: .pdf)) }
         for suffix in ["jpg", "png"] {
             let art = root.appendingPathComponent("art/\(book.asin).\(suffix)")
             if FileManager.default.fileExists(atPath: art.path) { local.imageURL = art; break }
