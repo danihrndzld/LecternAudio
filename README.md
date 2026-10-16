@@ -70,7 +70,7 @@ You can start from an OpenAudible folder, from your Audible account, or from bot
 
 1. **Open your OpenAudible library.** Choose File, then Open OpenAudible Library, and select the folder that contains `books.json`. Lectern Audio reads the folder and doesn't change OpenAudible's files.
 2. **Sign in to Audible.** Open Settings, go to Account, and choose Sign In to Audible. Amazon's sign in page opens inside Lectern Audio and handles the captcha and the two step code itself.
-3. **Sync.** Click the sync button in the toolbar. Books that are only in your account appear under Not Downloaded in the sidebar. Audible Plus titles that left the Plus catalog or that your ended membership no longer covers appear under Unavailable instead.
+3. **Sync.** Click the sync button in the toolbar. Books that are only in your account appear under Not Downloaded in the sidebar. Audible Plus titles that left the Plus catalog or that your ended membership no longer covers appear under Unavailable instead. After the first sync, Controls, then Quick Library Sync (Command-R) fetches only the books bought since the last sync, and Full Library Sync fetches the whole list again.
 
 Your account tokens stay in the macOS Keychain. When you sign out, Lectern Audio removes the device from your Amazon account and deletes the saved tokens.
 
@@ -82,7 +82,6 @@ Lectern Audio stays fast with 500 to 1,000 books. Switching a sidebar filter, so
 |---|---|---|
 | Finished to All Books | 9,118 ms | 46 ms |
 | A genre to All Books | 8,219 ms | 73 ms |
-| In Audible Only to All Books | 3,192 ms | 75 ms |
 
 The list is a native AppKit table that updates its visible rows in place, and covers are small thumbnails decoded in the background. The [0.2.0 release notes](https://github.com/danihrndzld/LecternAudio/releases/tag/v0.2.0) explain the cause and how we measured it.
 
@@ -135,12 +134,14 @@ Then build and run the `LecternAudio` scheme. The project file is generated from
 
 The first build downloads the FFmpeg 8.0 and aria2 1.37.0 source code, checks their checksums, and builds two small helper programs that the app uses to convert and download. Later builds reuse them, so you don't need to install either one yourself.
 
-To run the tests and a full build, use the commands below. CI runs the same steps on every pull request, on Linux for the package and on macOS for the app.
+To run the tests, use the commands below. `xcodebuild … test` builds the app first, so you don't need a separate build, and then compares the main window with the snapshots in `App/Tests/__Snapshots__`. The snapshots were recorded with Xcode 27.1 on a 2x display, so another Xcode or display can fail them.
 
 ```sh
 swift test --package-path Packages/AudibleCore
-xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build
+xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build test
 ```
+
+CI runs on every pull request that changes code: it runs the package tests on Linux and macOS and builds the app on macOS. It skips the snapshots, because the GitHub runner draws the sidebar and inspector blank. Pull requests that change only Markdown files or `docs/` skip the builds.
 
 The tests run offline, because CI can't sign in to Audible. Network code is tested against recorded responses with personal data removed.
 
@@ -185,7 +186,7 @@ Add the `hold` label to a pull request to stop the automatic merge. The rules th
 <details>
 <summary>Releasing</summary>
 
-Push a tag that starts with `v`, e.g., `git tag v0.3.0 && git push origin v0.3.0`. The release workflow builds an Apple silicon app, packs it as a DMG and a ZIP, signs the ZIP for updates with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP, and `appcast.xml`. The tag sets the version, and the workflow run number sets the build number. `scripts/release.sh 0.3.0 1` builds the same files on your Mac with the key in your login Keychain, and `ARCHS="arm64 x86_64"` before it makes a universal app.
+Tag `main` and push the tag, e.g., `git tag v0.3.8 origin/main && git push origin v0.3.8`. No version bump pull request is needed: the tag sets the version, and `project.yml` keeps `0.0.0-dev` for local builds. The release workflow builds an Apple silicon app, signs it with the Apple Development certificate in the `SIGNING_CERTIFICATE_P12` (base64 .p12) and `SIGNING_CERTIFICATE_PASSWORD` secrets, and fails without them. It packs the app as a DMG and a ZIP, signs the ZIP for updates with the `SPARKLE_PRIVATE_KEY` secret, and publishes a GitHub release with the DMG, the ZIP, and `appcast.xml`. The workflow run number sets the build number. `scripts/release.sh 0.3.8 1` builds the same files on your Mac with the key in your login Keychain, signed ad hoc unless you set `SIGN_IDENTITY`, and `ARCHS="arm64 x86_64"` before it makes a universal app.
 
 </details>
 

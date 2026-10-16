@@ -1,14 +1,19 @@
 # ADR 0001: Native SwiftUI + Swift core package; CI-gated automerge
 
-Status: accepted 2026-10-11. The memo below was written by an advisor model (Fable). These deviations apply:
+Status: accepted 2026-10-11. The memo below was written by an advisor model (Fable) and stays as history. The project deviates from it as follows (updated after 0.3.7):
 
-- The repo is **private** (owner's request). Rulesets and merge queue need a paid plan on private repos, so the merge gate is `automerge.yml`: it runs on `workflow_run` of CI and squash-merges only when all CI jobs pass on the PR's head SHA. This works on any plan.
-- No release, notarization or Sparkle pipeline yet: the only signing identity available is Apple Development (no Developer ID). Add it when a Developer ID exists.
-- GRDB is deferred until Earmark owns its own library store (sync issue). v0.1 reads OpenAudible's `books.json` directly.
-- macOS CI minutes are billed on private repos; the core suite also runs on Linux to keep feedback cheap.
+- The repo is public. It was private when this ADR was accepted. Standard macOS runner minutes are free on public repos; the core suite still also runs on Linux (`core-linux`) to keep `AudibleCore` free of AppKit.
+- No rulesets, branch protection or merge queue. The merge gate is `automerge.yml`: it runs on `workflow_run` of CI and squash-merges only when all CI jobs pass on the PR's head SHA (`--match-head-commit`), skips PRs that touch `.github/`, and then dispatches `ci.yml` on main so that run saves the caches PRs restore (#83).
+- CI (`ci.yml`) has the jobs `changes`, `core-linux`, `macos-test` (`swift test`) and `macos-build` (`xcodebuild build`); docs-only PRs skip the last three. There is no `pr-title` or `claude-review` job, and no `merge_group` trigger.
+- The agent workflow is `claude.yml`, triggered by the owner's `agent` label or an `@claude` comment from the owner, not `claude-issue.yml` with a `claude` label.
+- Releases: `release.yml` runs on `v*` tags and calls `scripts/release.sh`, which builds an arm64 app, signs it inside out, makes the DMG and ZIP, and writes `appcast.xml` signed with Sparkle 2.10.0's EdDSA key. All three are GitHub Release assets; there is no `gh-pages` branch. Since #69 (release 0.3.3) the app is signed with the owner's Apple Development certificate from the secrets `SIGNING_CERTIFICATE_P12` and `SIGNING_CERTIFICATE_PASSWORD`. There is no Developer ID, so releases are not notarized.
+- No release-please, `version.txt` or `CHANGELOG.md`. A release is a tag on main (#82): `release.sh` takes the version from the tag and the build number from the run number, and `project.yml`'s `MARKETING_VERSION` is `0.0.0-dev`.
+- No dependabot.
+- No GRDB. The app reads OpenAudible's `books.json` directly and saves each account's synced list as JSON in `accounts/<storageID>/catalog.json`.
+- Snapshot tests (swift-snapshot-testing) run on a developer Mac only (#60), because the hosted runner draws the glass sidebar and inspector blank. There is no XCUITest.
 - AAX/AAXC conversion uses bundled LGPL FFmpeg (amended at the owner's request, 2026-10-11). The helper inherits the app sandbox; arbitrary external executables cannot be launched there. The account workflow requests authorized licenses and manages credentials internally, retaining manual activation only for standalone imports. See `../aax-conversion.md` for validation and limitations. No third party key service is a dependency; the memo's native decrypt proposal below is superseded.
 
-Note: the app was renamed from Earmark to Lectern Audio after this ADR; the text above and below keeps the old name.
+Note: the app was renamed from Earmark to Lectern Audio after this ADR; the memo below keeps the old name.
 
 ---
 
