@@ -61,8 +61,9 @@ jobs:
           path: Packages/AudibleCore/.build
           key: ${{ steps.spm-linux.outputs.cache-primary-key }}
   # The app build, the AudibleCore tests and the launch smoke test share one runner and one DerivedData. The
-  # tests ran as `swift test` on a second runner with a cached .build, but llbuild compares inodes, so a .build
-  # restored from a tar rebuilt every C object (BoringSSL, about 65 s) on each PR run (PR #93).
+  # tests ran as `swift test` on a second runner with a cached .build, but a .build saved on another runner image
+  # rebuilt every C object (the SDK headers' mtimes change with each image build; BoringSSL, about 65 s), and
+  # xcodebuild's build system reuses them (PR #93, docs/memory.md).
   macos-build:
     needs: changes
     if: needs.changes.outputs.code == 'true'
