@@ -11,12 +11,15 @@ source_sha=60a420ad7085eb616cb6e2bdf0a7206d68ff3d37fb5a956dc44242eb2f79b66b
 architectures="${ARCHS:-$(uname -m)}"
 deployment_target="${MACOSX_DEPLOYMENT_TARGET:-26.0}"
 script_sha=$(shasum -a 256 "$0" | cut -d ' ' -f 1)
-mkdir -p "$cache"
+# The verified tarball and the built helper (keyed by its build stamp) are shared by every worktree, stored with an atomic mv.
+shared="$HOME/Library/Caches/LecternAudio"
+mkdir -p "$cache" "$shared"
 if [ ! -f "$archive" ]; then
-    curl --fail --location --retry 3 https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz -o "$archive.download"
+    if [ -f "$shared/aria2-1.37.0.tar.xz" ]; then cp "$shared/aria2-1.37.0.tar.xz" "$archive.download"; else curl --fail --location --retry 3 https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz -o "$archive.download"; fi
     mv "$archive.download" "$archive"
 fi
 printf '%s  %s\n' "$source_sha" "$archive" | shasum -a 256 --check --status
+[ -f "$shared/aria2-1.37.0.tar.xz" ] || { cp "$archive" "$shared/aria2-1.37.0.tar.xz.$$" && mv -f "$shared/aria2-1.37.0.tar.xz.$$" "$shared/aria2-1.37.0.tar.xz"; }
 if [ ! -d "$source_dir" ]; then tar -xf "$archive" -C "$cache"; fi
 
 binaries=()
@@ -25,6 +28,12 @@ for architecture in $architectures; do
         *) echo "Unsupported aria2 architecture: $architecture" >&2; exit 1 ;; esac
     build_dir="$cache/$architecture"
     stamp="$script_sha-$deployment_target"
+    shared_binary="$shared/aria2c-$architecture-$stamp"
+    if [ ! -x "$build_dir/src/aria2c" ] || [ "$(cat "$build_dir/lectern-build-id" 2>/dev/null || true)" != "$stamp" ]; then
+        if [ -x "$shared_binary" ]; then
+            mkdir -p "$build_dir/src" && cp "$shared_binary" "$build_dir/src/aria2c" && printf '%s' "$stamp" > "$build_dir/lectern-build-id"
+        fi
+    fi
     if [ ! -x "$build_dir/src/aria2c" ] || [ "$(cat "$build_dir/lectern-build-id" 2>/dev/null || true)" != "$stamp" ]; then
         rm -rf "$build_dir" && mkdir -p "$build_dir"
         (
@@ -45,6 +54,7 @@ for architecture in $architectures; do
             xcrun strip -x src/aria2c
             printf '%s' "$stamp" > lectern-build-id
         )
+        cp "$build_dir/src/aria2c" "$shared_binary.$$" && mv -f "$shared_binary.$$" "$shared_binary"
     fi
     binaries+=("$build_dir/src/aria2c")
 done

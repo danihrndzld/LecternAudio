@@ -59,7 +59,8 @@ targets:
           - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.lecternaudio
+        # LECTERN_ID_SUFFIX (empty by default) gives a worktree its own bundle id, defaults domain and container.
+        PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.lecternaudio$(LECTERN_ID_SUFFIX)
         PRODUCT_NAME: Lectern Audio
         # Without this the module is "Lectern_Audio", sanitized from PRODUCT_NAME.
         PRODUCT_MODULE_NAME: LecternAudio
@@ -85,7 +86,7 @@ targets:
         product: SnapshotTesting
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.lecternaudio.tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.danihrndzld.lecternaudio.tests$(LECTERN_ID_SUFFIX)
         GENERATE_INFOPLIST_FILE: YES
         # PRODUCT_NAME is "Lectern Audio", so the host path cannot be derived from the target name.
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Lectern Audio.app/Contents/MacOS/Lectern Audio
