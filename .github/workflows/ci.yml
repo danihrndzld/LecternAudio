@@ -127,7 +127,7 @@ jobs:
       - run: xcodegen generate
       # Its own step so its time shows; the build then uses the resolved versions without fetching again.
       - run: ls -la ~/Library/Caches/org.swift.swiftpm/manifests build/SourcePackages || true; time xcodebuild -version; time xcodebuild -version
-      - run: time xcodebuild -resolvePackageDependencies -scheme LecternAudio -derivedDataPath build
+      - run: time xcodebuild -resolvePackageDependencies -scheme LecternAudio -derivedDataPath build -skipPackageUpdates
       # The first lines show when the build really starts, the last ones the timing summary; the full log stays in
       # $RUNNER_TEMP for the rest of the job.
       - run: |
