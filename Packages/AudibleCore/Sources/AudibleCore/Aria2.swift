@@ -127,7 +127,7 @@ public enum Aria2 {
         #endif
         try? stdin.fileHandleForWriting.write(contentsOf: Data(input.utf8))
         try? stdin.fileHandleForWriting.close()
-        let reader = Task.detached {
+        let reader = Task.detached(executorPreference: BlockingExecutor.shared) {
             defer { try? stdout.fileHandleForReading.close() }
             var pending = Data()
             while let data = try? stdout.fileHandleForReading.read(upToCount: 4096), !data.isEmpty {

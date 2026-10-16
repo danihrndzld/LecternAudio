@@ -153,3 +153,14 @@ private func hammer(_ limiter: ConcurrencyLimiter, tasks: Int, peak: Peak) async
     #expect(await peak.highest <= 2)
     #expect(await limiter.state == (0, 0))
 }
+
+/// Blocking work on `BlockingExecutor` must leave the cooperative pool free: with more blocked tasks than
+/// cores, a short sleep still finishes on time (on the pool it would wait the full 1 s).
+@Test func blockingExecutorLeavesCooperativePoolFree() async throws {
+    let blocked = (0..<(2 * ProcessInfo.processInfo.activeProcessorCount)).map { _ in
+        Task.detached(executorPreference: BlockingExecutor.shared) { usleep(1_000_000) }  // blocks its thread, like a reader loop
+    }
+    let elapsed = try await ContinuousClock().measure { try await Task.sleep(for: .milliseconds(50)) }
+    #expect(elapsed < .milliseconds(500))
+    for task in blocked { await task.value }
+}

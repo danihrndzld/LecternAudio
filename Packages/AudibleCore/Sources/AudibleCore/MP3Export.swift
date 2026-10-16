@@ -18,6 +18,14 @@ public enum MP3Export {
     /// `tag.chapters` defaults to the source's chapters when empty. `progress` gets 0...1.
     public static func run(source: URL, destination: URL, tag: ID3Tag, options: Options = .init(),
                            progress: @Sendable (Double) -> Void = { _ in }) async throws {
+        // Decoding and encoding block their thread for the whole export.
+        try await withTaskExecutorPreference(BlockingExecutor.shared) {
+            try await export(source: source, destination: destination, tag: tag, options: options, progress: progress)
+        }
+    }
+
+    private static func export(source: URL, destination: URL, tag: ID3Tag, options: Options,
+                               progress: @Sendable (Double) -> Void) async throws {
         let asset = AVURLAsset(url: source)
         guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
             throw Failure(errorDescription: "\(source.lastPathComponent) has no audio track")
