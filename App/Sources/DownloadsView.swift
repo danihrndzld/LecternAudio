@@ -27,7 +27,7 @@ struct DownloadsView: View {
                         Button("Retry") { downloads.enqueue([job.book]) }
                     } else if [.queued, .licensing, .downloading, .converting].contains(job.state) {
                         // A held queue tells its queued jobs to retry once back online, so offer Retry there too.
-                        if job.state == .queued && downloads.waitingForConnection {
+                        if job.state == .queued && (downloads.waitingForConnection || downloads.throttleMessage != nil) {
                             Button("Retry") { downloads.enqueue([job.book]) }
                         }
                         Button("Cancel") { downloads.cancel(job.id) }
@@ -41,6 +41,7 @@ struct DownloadsView: View {
                                            description: Text("Choose a book and select Download and Convert, or download all missing books below."))
                 }
             }
+            if let throttle = downloads.throttleMessage { Text(throttle).font(.callout) }
             if let error = downloads.error { Text(error).foregroundStyle(.red).font(.callout) }
             HStack {
                 Button("Download Missing Books…") { library.downloadAll() }

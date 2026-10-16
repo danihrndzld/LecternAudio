@@ -72,7 +72,11 @@ public enum AudibleContent {
               let license = envelope["content_license"] as? [String: Any] else {
             throw AudibleError("Audible did not grant a download license for this book.")
         }
-        guard license["status_code"] as? String == "Granted" else { throw AudibleError(denialMessage(license)) }
+        guard license["status_code"] as? String == "Granted" else {
+            let message = denialMessage(license)
+            if isThrottled(license) { throw CustomerThrottled(message: message) }
+            throw AudibleError(message)
+        }
         guard license["asin"] as? String == asin else {
             throw AudibleError("Audible did not grant a download license for this book.")
         }
@@ -110,6 +114,10 @@ public enum AudibleContent {
     /// `AYCL` for the Audible Plus catalog, `Client` for the device) and lists each failed one in
     /// `license_denial_reasons` with a `rejectionReason`. Audible's own `message` can name the customer,
     /// so only the check and reason codes are shown.
+    static func isThrottled(_ license: [String: Any]) -> Bool {
+        (license["license_denial_reasons"] as? [[String: Any]] ?? []).contains { $0["rejectionReason"] as? String == "CustomerThrottled" }
+    }
+
     static func denialMessage(_ license: [String: Any]) -> String {
         let reasons = (license["license_denial_reasons"] as? [[String: Any]] ?? []).compactMap { reason -> (type: String, reason: String)? in
             guard let rejection = reason["rejectionReason"] as? String, !rejection.isEmpty else { return nil }

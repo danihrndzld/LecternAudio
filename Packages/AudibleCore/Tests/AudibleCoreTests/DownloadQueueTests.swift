@@ -124,3 +124,19 @@ private func job(_ asin: String = "B0000001", state: DownloadJob.State) -> Downl
     #expect(DownloadQueue.next([], limit: 3).isEmpty)
     #expect(DownloadQueue.next([job("B01", state: .complete)], limit: 3).isEmpty)
 }
+
+// MARK: - A throttled account pauses the queue (issue #97)
+
+@Test func pausedQueueStartsNothingAndKeepsJobsQueued() {
+    let jobs = [job("B0000001", state: .queued), job("B0000002", state: .queued)]
+    #expect(DownloadQueue.next(jobs, limit: 2) .count == 2)
+    #expect(DownloadQueue.next(jobs, limit: 2, paused: true).isEmpty)
+}
+
+@Test func throttledLicenseThrowsCustomerThrottledOnlyForThatReason() {
+    let throttled: [String: Any] = ["license_denial_reasons": [["validationType": "Ownership", "rejectionReason": "CustomerThrottled"]]]
+    let owned: [String: Any] = ["license_denial_reasons": [["validationType": "Ownership", "rejectionReason": "NotOwned"]]]
+    #expect(AudibleContent.isThrottled(throttled))
+    #expect(!AudibleContent.isThrottled(owned))
+    #expect(!AudibleContent.isThrottled([:]))
+}
