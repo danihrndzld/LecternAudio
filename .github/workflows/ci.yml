@@ -132,7 +132,7 @@ jobs:
       - run: |
           xcodebuild -scheme LecternAudio -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
             -disableAutomaticPackageResolution -showBuildTimingSummary build CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
-            | tee "$RUNNER_TEMP/xcodebuild.log" | awk 'NR <= 20' || status=$?
+            | tee "$RUNNER_TEMP/xcodebuild.log" | awk 'NR <= 20 { print; fflush() }' || status=$?
           echo ...
           tail -80 "$RUNNER_TEMP/xcodebuild.log"
           exit "${status:-0}"
