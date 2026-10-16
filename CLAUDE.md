@@ -15,9 +15,12 @@ Run all of these before pushing:
 ```sh
 swift test --package-path Packages/AudibleCore
 xcodegen generate                      # project.yml is the source of truth; LecternAudio.xcodeproj is generated and git-ignored
-xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build build
-xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build test   # main window snapshots (local only, not run in CI)
+xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build test LECTERN_ID_SUFFIX=.$(basename "$PWD")   # builds the app, then the main window snapshots (local only)
 ```
+- `test` builds the whole app with both helper phases, so a separate `build` adds nothing; CI keeps its own build job.
+  `LECTERN_ID_SUFFIX` (empty by default, so the owner's and release builds stay `com.danihrndzld.lecternaudio`)
+  gives each worktree its own bundle id, defaults domain and sandbox container, so parallel worktrees run
+  `test` at the same time without a lock. Worktree directory names may hold only letters, digits, `-` and `.`.
 - Snapshot references live in `App/Tests/__Snapshots__`, recorded on a developer Mac (Xcode 27.1, 2x). They
   are not run in CI: the hosted runner draws the glass sidebar and inspector blank. Record with
   `TEST_RUNNER_LECTERN_RECORD_SNAPSHOTS=1 xcodebuild … test` and look at the new PNGs before committing them: in
@@ -26,7 +29,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
   `AudibleSession(loadKeychain: false)` and put back anything they change; never let a test write the
   library bookmark. As the test host (`Harness.testHost`) the app skips the restore, the Keychain and Sparkle.
 - One test: `swift test --package-path Packages/AudibleCore --filter <testFunctionName>` (Swift Testing `@Test` functions).
-- The first app build compiles FFmpeg 8.0 and aria2 1.37.0 from checksum-pinned tarballs (`scripts/build-ffmpeg.sh`, `scripts/build-aria2.sh`, run as post-build scripts) and caches them under `build/`.
+- The first app build compiles FFmpeg 8.0 and aria2 1.37.0 from checksum-pinned tarballs (`scripts/build-ffmpeg.sh`, `scripts/build-aria2.sh`, run as post-build scripts) and caches them under `build/`. The built binaries (named by their build stamp: script SHA-256 and deployment target) and the checksum-verified tarballs are also stored in `~/Library/Caches/LecternAudio/`, so a new worktree copies them instead of compiling (FFmpeg takes minutes, aria2 26 to 41 s) or downloading (ffmpeg.org served the tarball in 98 s). Never share `-derivedDataPath` between worktrees.
 - Release locally: `scripts/release.sh <version> <build>` builds an Apple silicon (arm64) app, signs it inside out with `SIGN_IDENTITY` (default `-`, ad hoc), makes the DMG and ZIP, and writes `appcast.xml` signed with the Sparkle EdDSA key (from `SPARKLE_PRIVATE_KEY` or the login Keychain). CI does the same on `v*` tags (`.github/workflows/release.yml`), signed with the owner's Apple Development certificate from the secrets `SIGNING_CERTIFICATE_P12` (base64 .p12) and `SIGNING_CERTIFICATE_PASSWORD`; the release fails without them. To release: tag main (`git tag vX.Y.Z origin/main && git push origin vX.Y.Z`), then replace the generated notes with `gh release edit --notes-file`. There is no version bump PR: `release.sh` sets the version from the tag and the build number from the run number, so `project.yml`'s `0.0.0-dev` only names local builds.
 - Running tests rewrites `Packages/AudibleCore/Package.resolved` with a Sparkle pin; don't commit that churn unless dependencies changed.
 
@@ -96,4 +99,4 @@ open -g -n -W --stdout /tmp/perf-release.txt --env LECTERN_HARNESS=1 --env LECTE
 
 ## Workflow
 
-Commits and PRs use `Daniel Hernández <danisnowman@gmail.com>` and carry no `Co-Authored-By: Claude` or "Generated with Claude Code" lines (they were removed from history once with git filter-repo). Agents work in their own git worktree (`git worktree add ../Lectern-<topic> -b <branch> origin/main`) and never edit, stash, reset or build in the owner's main checkout. Issues labeled `agent` are implemented by `.github/workflows/claude.yml` (only the repo owner's label or comment triggers it). CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green on the exact head commit. Add the label `hold` to a PR to stop the merge. PRs that change files under `.github/` are never automerged; merge them by hand. Nobody reviews code, so the tests are the review. Issues labeled `feature-request` or `future` wait until the owner adds `agent`.
+Commits and PRs use `Daniel Hernández <danisnowman@gmail.com>` and carry no `Co-Authored-By: Claude` or "Generated with Claude Code" lines (they were removed from history once with git filter-repo). Agents work in their own git worktree (`git worktree add ../Lectern-<topic> -b <branch> origin/main`; after `git worktree remove`, run `defaults delete com.danihrndzld.lecternaudio.Lectern-<topic>` and delete `~/Library/Containers/com.danihrndzld.lecternaudio.Lectern-<topic>`) and never edit, stash, reset or build in the owner's main checkout. Issues labeled `agent` are implemented by `.github/workflows/claude.yml` (only the repo owner's label or comment triggers it). CI (`ci.yml`) runs on every PR. `automerge.yml` squash-merges the PR when CI is green on the exact head commit. Add the label `hold` to a PR to stop the merge. PRs that change files under `.github/` are never automerged; merge them by hand. Nobody reviews code, so the tests are the review. Issues labeled `feature-request` or `future` wait until the owner adds `agent`.
