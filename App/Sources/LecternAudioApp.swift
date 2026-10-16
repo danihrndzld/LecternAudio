@@ -232,7 +232,7 @@ extension LibraryFilter {
     let activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical], reason: "perf cycle")
     defer { ProcessInfo.processInfo.endActivity(activity) }
     NSApp.windows.first?.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
-    print("perf: doubleClickInterval \(NSEvent.doubleClickInterval) s, gesture variant \(env["LECTERN_GRID_GESTURE"] ?? "A")")
+    print("perf: doubleClickInterval \(NSEvent.doubleClickInterval) s")
     if transitions.contains(where: { $0.name.hasPrefix("Grid: click") }) { NSApp.activate(); NSApp.windows.first?.makeKeyAndOrderFront(nil) }
     try? await Task.sleep(for: .seconds(3))
     let signposter = OSSignposter(subsystem: "com.danihrndzld.lecternaudio", category: .pointsOfInterest)
@@ -290,8 +290,8 @@ extension LibraryFilter {
     NSApp.terminate(nil)
 }
 
-nonisolated(unsafe) private var selectionChangedAt: ContinuousClock.Instant?
-nonisolated(unsafe) private var playedAt: ContinuousClock.Instant?
+nonisolated(unsafe) private var selectionChangedAt: ContinuousClock.Instant?  // perf harness only; written and read on the main thread (onChange fires in the MainActor model's willSet)
+nonisolated(unsafe) private var playedAt: ContinuousClock.Instant?  // same: perf harness only, main thread (Player.book willSet)
 
 @MainActor private func gridScrollView() -> NSScrollView? {
     func find(_ v: NSView) -> NSScrollView? {
