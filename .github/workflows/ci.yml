@@ -24,8 +24,8 @@ jobs:
           fetch-depth: 0
       - id: diff
         run: |
-          # On main only macos-build has to run: its DerivedData key is the commit. The test jobs' caches are keyed
-          # by Package.resolved, so they run there only when a dependency or a cache path (ci.yml) changed.
+          # On main only macos-build has to run: its DerivedData key is the commit. core-linux's cache is keyed by
+          # Package.resolved, so it runs there only when a dependency or a cache path (ci.yml) changed.
           if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
             echo code=true
             if git diff --name-only HEAD~1 HEAD | grep -qE '(^|/)Package\.(swift|resolved)$|^\.github/workflows/ci\.yml$' ||
@@ -60,34 +60,10 @@ jobs:
         with:
           path: Packages/AudibleCore/.build
           key: ${{ steps.spm-linux.outputs.cache-primary-key }}
-  # Tests and the app build run on separate runners in parallel (standard runners are free on public repos).
-  macos-test:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true')
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-      # Diagnostic: does the runner's cold audio stack stall for about 30 s? Runs alongside the tests, printed below.
-      - run: ( time afconvert -f m4af -d aac /System/Library/Sounds/Ping.aiff "$RUNNER_TEMP/w.m4a" ) > "$RUNNER_TEMP/afconvert.txt" 2>&1 &
-        shell: bash
-      - id: spm-macos
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            Packages/AudibleCore/.build
-            ~/Library/Caches/org.swift.swiftpm/manifests
-          key: spm-macos-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
-          restore-keys: spm-macos-
-      - run: swift test --package-path Packages/AudibleCore --disable-index-store
-      - if: always()
-        run: cat "$RUNNER_TEMP/afconvert.txt"
-      - if: github.event_name != 'pull_request' && steps.spm-macos.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            Packages/AudibleCore/.build
-            ~/Library/Caches/org.swift.swiftpm/manifests
-          key: ${{ steps.spm-macos.outputs.cache-primary-key }}
+  # The app build, the AudibleCore tests and the launch smoke test share one runner and one DerivedData. The
+  # tests ran as `swift test` on a second runner with a cached .build, but a .build saved on another runner image
+  # rebuilt every C object (the SDK headers' mtimes change with each image build; BoringSSL, about 65 s), and
+  # xcodebuild's build system reuses them (PR #93, docs/memory.md).
   macos-build:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -125,13 +101,12 @@ jobs:
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
       - run: xcodegen generate
-      # Its own step so its time shows; the build then uses the resolved versions without fetching again.
-      - run: xcodebuild -resolvePackageDependencies -scheme LecternAudio -derivedDataPath build
-      # The first lines show when the build really starts, the last ones the timing summary; the full log stays in
-      # $RUNNER_TEMP for the rest of the job.
+      # The AudibleCoreTests scheme (project.yml) builds the app for testing and runs the package's tests from the
+      # test bundle. The first lines show when the build really starts, the last ones the test results; the full log
+      # stays in $RUNNER_TEMP for the rest of the job.
       - run: |
-          xcodebuild -scheme LecternAudio -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
-            -disableAutomaticPackageResolution -showBuildTimingSummary build CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+          xcodebuild test -scheme AudibleCoreTests -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
             | tee "$RUNNER_TEMP/xcodebuild.log" | awk 'NR <= 20 { print; fflush() }' || status=$?
           echo ...
           tail -80 "$RUNNER_TEMP/xcodebuild.log"
