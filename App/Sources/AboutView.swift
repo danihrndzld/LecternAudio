@@ -96,7 +96,7 @@ struct DiagnosticsView: View {
         Downloaded: \(library.count(.downloaded))
         Not downloaded: \(library.count(.notDownloaded))
         Not converted: \(library.count(.notConverted))
-        In Audible only: \(library.count(.audibleOnly))
+        Unavailable: \(library.count(.unavailable))
         With PDF: \(library.count(.pdfs))
         Imported files: \(library.imported.count)
         Running jobs: \(library.isRunningJobs ? "yes" : "no")

@@ -163,7 +163,7 @@ private struct Sidebar: View {
                 row(.downloaded, "arrow.down.circle")
                 row(.notDownloaded, "icloud.and.arrow.down")
                 row(.notConverted, "lock")
-                row(.audibleOnly, "icloud")
+                row(.unavailable, "nosign")
                 row(.pdfs, "doc.richtext")
             }
             Section("Genres") {
