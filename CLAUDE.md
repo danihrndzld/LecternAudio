@@ -29,7 +29,7 @@ xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath bui
   `AudibleSession(loadKeychain: false)` and put back anything they change; never let a test write the
   library bookmark. As the test host (`Harness.testHost`) the app skips the restore, the Keychain and Sparkle.
   To catch launch crashes like #63 and #64, which the test host never reaches, CI launches the Debug app with
-  the fixture library (`Fixtures/books.json`, list and grid, 3 times each) and fails on a crash, a 60 s
+  the fixture library (`Fixtures/books.json`, once in list and once in grid view on each PR; main runs skip it) and fails on a crash, a 60 s
   timeout or a missing PNG. The runner is macOS 26, so the owner's Mac stays the macOS 27 gate.
 - One test: `swift test --package-path Packages/AudibleCore --filter <testFunctionName>` (Swift Testing `@Test` functions).
 - The first app build compiles FFmpeg 8.0 and aria2 1.37.0 from checksum-pinned tarballs (`scripts/build-ffmpeg.sh`, `scripts/build-aria2.sh`, run as post-build scripts) and caches them under `build/`. The built binaries (named by their build stamp: script SHA-256 and deployment target) and the checksum-verified tarballs are also stored in `~/Library/Caches/LecternAudio/`, so a new worktree copies them instead of compiling (FFmpeg takes minutes, aria2 26 to 41 s) or downloading (ffmpeg.org served the tarball in 98 s). Never share `-derivedDataPath` between worktrees.
