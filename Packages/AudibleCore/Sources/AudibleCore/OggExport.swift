@@ -5,7 +5,7 @@ import AVFoundation
 /// with metadata, cover and chapters as Vorbis comments.
 public enum OggExport {
     public struct Options: Sendable {
-        /// libvorbis VBR quality 0...10 (10 = maximum, about 500 kbps for 44.1 kHz stereo).
+        /// libvorbis VBR quality 0...10 (10 = maximum, about 171 kbps for a 22.05 kHz stereo audiobook).
         public var quality = 10
         /// Write `destination/<nn> - <chapter>.ogg` instead of one file.
         public var splitChapters = false

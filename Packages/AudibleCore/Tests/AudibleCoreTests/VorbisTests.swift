@@ -134,3 +134,8 @@ import AVFoundation
     #expect(abs(second - 2) < 0.1, "chapter 2 is \(second) s")
 }
 #endif
+
+@Test func vorbisNominalBitrateForAudiobook() {
+    #expect(VorbisEncoder.nominalBitrate(quality: 0.5, sampleRate: 22_050, channels: 2) == 88)
+    #expect(VorbisEncoder.nominalBitrate(quality: 1.0, sampleRate: 22_050, channels: 2) == 171)
+}
