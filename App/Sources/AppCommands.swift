@@ -100,8 +100,8 @@ private struct ControlsCommands: Commands {
             Button("Connect to Audible…") { openWindow(id: SignInView.windowID) }
                 .keyboardShortcut("k")
                 .disabled(session.account != nil)
-            // Audible's library API is fetched in full either way: a partial (purchased_after) fetch would replace the saved list.
-            Button("Quick Library Sync") { sync("Quick sync (full fetch)") }
+            // Quick fetches only purchases since the last sync (purchased_after) and merges them into the saved list.
+            Button("Quick Library Sync") { sync("Quick sync", quick: true) }
                 .keyboardShortcut("r")
                 .disabled(session.account == nil || library.isSyncing)
             Button("Full Library Sync") { sync("Full sync") }
@@ -119,10 +119,10 @@ private struct ControlsCommands: Commands {
         }
     }
 
-    private func sync(_ name: String) {
+    private func sync(_ name: String, quick: Bool = false) {
         AppLog.shared.info("\(name) requested")
         Task {
-            do { library.sync(try await session.currentAccount()) }
+            do { library.sync(try await session.currentAccount(), quick: quick) }
             catch { library.syncError = error.localizedDescription }
         }
     }
