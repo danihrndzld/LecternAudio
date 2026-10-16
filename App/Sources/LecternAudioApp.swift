@@ -75,6 +75,7 @@ enum Harness {
 @MainActor private func debugSnapshot() async {
     let env = Harness.env
     guard let out = env["LECTERN_SNAPSHOT"] else { return }
+    fatalError("smoke test proof: must go red")
     try? await Task.sleep(for: .seconds(1))
     guard let window = NSApp.windows.first else { print("snapshot: no window", NSApp.windows); return }
     window.setFrame(NSRect(x: 0, y: 0, width: 1440, height: 900), display: true)
