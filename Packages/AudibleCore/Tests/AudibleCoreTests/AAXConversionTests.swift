@@ -141,7 +141,7 @@ private func fakeFFmpeg(in root: URL, body: String) throws -> URL {
     let executable = try fakeFFmpeg(in: root, body: """
     for argument in "$@"; do last="$argument"; done
     printf partial > "$last"
-    exec sleep 30
+    exec sleep 5
     """)
     let request = AAXConversionRequest(input: input, output: output, book: try conversionBook())
     let key = try ActivationBytes(String(repeating: "0", count: 8))

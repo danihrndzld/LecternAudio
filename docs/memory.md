@@ -95,6 +95,7 @@ An unsandboxed Debug build made with `CODE_SIGN_ENTITLEMENTS=` also dropped `dis
 - Agents must work in their own worktree. The owner's checkout once held important uncommitted work, and another session edited it live.
 - CI caches (the FFmpeg and aria2 builds, package checkouts and builds, DerivedData) are saved only by the main CI run that automerge dispatches after each merge (PR #83), because a merge with `GITHUB_TOKEN` fires no push event; PR runs only restore them.
 - Running `swift test` rewrites `Package.resolved` with a Sparkle pin. Don't commit that change by accident.
+- In CI run 38844219657 the `swift test` process froze for about 30 s and ten unrelated tests all reported 30.3 s. The 3-core runner gives Swift concurrency 3 pool threads, and the AVAssetReader export loops and the ffmpeg/aria2c pipe readers (`Task.detached` does not leave the pool) blocked all of them, so the cancel test could not terminate its `sleep 30` child. Blocking work now runs on `BlockingExecutor` (GCD). A 12-core Mac never showed it; `blockingExecutorLeavesCooperativePoolFree` does on any core count.
 - The CI runner uses Xcode 26, which failed to compile a large `ContentView` body that Xcode 27 compiled (PR #26). The log was cut off, so the cause is probably type checking time. Splitting the body into helper functions fixed it, so keep view bodies small.
 
 ## Download queue

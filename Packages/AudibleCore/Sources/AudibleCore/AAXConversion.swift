@@ -174,7 +174,7 @@ public actor AAXConverter {
         process.standardError = FileHandle.nullDevice
         do { try process.run() } catch { throw ConversionError.ffmpegUnavailable }
         try? pipe.fileHandleForWriting.close()
-        let reader = Task.detached {
+        let reader = Task.detached(executorPreference: BlockingExecutor.shared) {
             defer { try? pipe.fileHandleForReading.close() }
             var pending = Data()
             while let data = try? pipe.fileHandleForReading.read(upToCount: 4096), !data.isEmpty {
