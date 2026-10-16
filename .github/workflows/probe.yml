@@ -74,6 +74,7 @@ jobs:
           key: spm-linux-swift6.1-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
           restore-keys: spm-linux-swift6.1-
       - name: Inodes of the restored files, build (timed)
+        shell: bash
         run: |
           cd "$PKG"
           src=$(find .build/checkouts -name 'err_data.cc' | head -1); obj=$(find .build -name 'err_data.cc.o' | head -1)
@@ -81,6 +82,7 @@ jobs:
           time swift build --build-tests > "$RUNNER_TEMP/build1.log" 2>&1
           echo "compile lines: $(grep -c Compiling "$RUNNER_TEMP/build1.log")  C/C++: $(grep -cE 'Compiling .*\.(c|cc|S)$' "$RUNNER_TEMP/build1.log")"
       - name: Tar round trip of .build, build again (timed)
+        shell: bash
         run: |
           cd "$PKG"
           src=$(find .build/checkouts -name 'err_data.cc' | head -1); obj=$(find .build -name 'err_data.cc.o' | head -1)
