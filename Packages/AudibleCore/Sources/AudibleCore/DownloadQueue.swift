@@ -11,6 +11,14 @@ public struct ConnectionFailure: LocalizedError, Sendable, Equatable {
     public var errorDescription: String? { "Could not reach Audible. Check your connection and retry." }
 }
 
+/// Audible refused a license with `CustomerThrottled`. Every further request is refused too until the
+/// throttle clears (24 to 48 h), so the queue stops starting jobs and keeps the rest queued (issue #97).
+public struct CustomerThrottled: LocalizedError, Sendable, Equatable {
+    public let message: String
+    public init(message: String) { self.message = message }
+    public var errorDescription: String? { message }
+}
+
 /// The rules the download queue runs on. The queue itself is `DownloadModel` in the app target,
 /// which has no test target, so every rule that can be stated as a function lives here instead and
 /// is covered by offline tests.
@@ -41,7 +49,8 @@ public enum DownloadQueue {
     /// `live` holds the jobs that still have a task, including one that was cancelled and is still
     /// unwinding (aria2c can take seconds to stop). Such a job keeps its slot, and if Retry has
     /// already queued it again it is not started a second time; its task's exit starts it instead.
-    public static func next(_ jobs: [DownloadJob], live: Set<DownloadJob.ID> = [], limit: Int) -> [DownloadJob.ID] {
+    public static func next(_ jobs: [DownloadJob], live: Set<DownloadJob.ID> = [], limit: Int, paused: Bool = false) -> [DownloadJob.ID] {
+        guard !paused else { return [] }
         let running = live.union(jobs.filter { isRunning($0.state) }.map(\.id)).count
         let free = max(0, min(max(limit, 1), concurrencyRange.upperBound) - running)
         guard free > 0 else { return [] }

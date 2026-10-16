@@ -24,6 +24,9 @@ final class DownloadModel {
     /// Cleared by any enqueue (an explicit action, or the automatic one after a successful sync) and
     /// by a completed job, since both prove the network works again.
     private(set) var waitingForConnection = false
+    /// Audible's throttle message while the queue is paused by `CustomerThrottled` (issue #97). In memory
+    /// only: a user action (enqueue, Retry) clears it, and a launch starts without it.
+    private(set) var throttleMessage: String?
 
     var pendingCount: Int { jobs.count { $0.state == .queued || DownloadQueue.isRunning($0.state) } }
     /// Tasks in flight, so the window can open the Downloads sheet when work starts. Stored rather
@@ -46,6 +49,7 @@ final class DownloadModel {
         error = nil
         queueIsReadable = true
         waitingForConnection = false
+        throttleMessage = nil
         if let root, FileManager.default.fileExists(atPath: root.appendingPathComponent("queue.json").path) {
             do {
                 jobs = try DownloadJob.restore(from: Data(contentsOf: root.appendingPathComponent("queue.json")))
@@ -73,6 +77,7 @@ final class DownloadModel {
         guard persist() else { return }
         // An explicit action, or the automatic enqueue after a successful sync, ends a connection hold.
         waitingForConnection = false
+        if userInitiated { throttleMessage = nil }
         advance()
     }
 
@@ -121,7 +126,7 @@ final class DownloadModel {
     /// Also called when the limit changes in Settings, so a raised limit applies at once.
     func advance() {
         guard let root, let session, let library, !waitingForConnection else { return }
-        for id in DownloadQueue.next(jobs, live: Set(tasks.keys), limit: Prefs.downloadConcurrency) {
+        for id in DownloadQueue.next(jobs, live: Set(tasks.keys), limit: Prefs.downloadConcurrency, paused: throttleMessage != nil) {
             guard let job = jobs.first(where: { $0.id == id }) else { continue }
             start(job, root: root, session: session, library: library)
         }
@@ -269,6 +274,9 @@ final class DownloadModel {
                       DownloadQueue.isRunning(current) else { return }
                 if Task.isCancelled || error is CancellationError {
                     update(job.id, .cancelled, message: "Cancelled. Retry to resume.")
+                } else if let throttled = error as? CustomerThrottled {
+                    throttleMessage = throttled.message
+                    update(job.id, .queued, message: "Paused: Audible is limiting this account.")
                 } else if DownloadQueue.isOffline(error) {
                     waitingForConnection = true
                     update(job.id, .queued, message: "Waiting for a connection. Retry once you are back online.")
