@@ -46,6 +46,8 @@ struct DownloadsView: View {
             HStack {
                 Button("Download Missing Books…") { library.downloadAll() }
                     .disabled(library.downloadableCount == 0)
+                Button("Clear") { downloads.clearFinished() }
+                    .disabled(downloads.jobs.allSatisfy { $0.state == .queued || DownloadQueue.isRunning($0.state) })
                 Spacer()
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction)
             }
