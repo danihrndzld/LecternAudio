@@ -59,3 +59,34 @@ jobs:
         with:
           name: spm-logs
           path: ${{ runner.temp }}/*.log
+  # Same question on Linux, where CI's cached .build is reused: are the inode numbers the same in every run?
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    env:
+      PKG: Packages/AudibleCore
+    steps:
+      - uses: actions/checkout@v4
+      - id: spm-linux
+        uses: actions/cache/restore@v4
+        with:
+          path: Packages/AudibleCore/.build
+          key: spm-linux-swift6.1-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
+          restore-keys: spm-linux-swift6.1-
+      - name: Inodes of the restored files, build (timed)
+        run: |
+          cd "$PKG"
+          src=$(find .build/checkouts -name 'err_data.cc' | head -1); obj=$(find .build -name 'err_data.cc.o' | head -1)
+          stat -c '%Y %d %i %s %n' "$src" "$obj" .build/build.db /usr/include/stdio.h Package.swift
+          time swift build --build-tests > "$RUNNER_TEMP/build1.log" 2>&1
+          echo "compile lines: $(grep -c Compiling "$RUNNER_TEMP/build1.log")  C/C++: $(grep -cE 'Compiling .*\.(c|cc|S)$' "$RUNNER_TEMP/build1.log")"
+      - name: Tar round trip of .build, build again (timed)
+        run: |
+          cd "$PKG"
+          src=$(find .build/checkouts -name 'err_data.cc' | head -1); obj=$(find .build -name 'err_data.cc.o' | head -1)
+          tar --posix -cf "$RUNNER_TEMP/build.tar" .build
+          mv .build "$RUNNER_TEMP/build-old"
+          tar -xf "$RUNNER_TEMP/build.tar" -P --delay-directory-restore
+          stat -c '%Y %d %i %s %n' "$src" "$obj" .build/build.db
+          time swift build --build-tests > "$RUNNER_TEMP/build3.log" 2>&1
+          echo "compile lines: $(grep -c Compiling "$RUNNER_TEMP/build3.log")  C/C++: $(grep -cE 'Compiling .*\.(c|cc|S)$' "$RUNNER_TEMP/build3.log")"
