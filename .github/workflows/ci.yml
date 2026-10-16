@@ -29,18 +29,17 @@ jobs:
   core-linux:
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    # The image's preinstalled Swift (6.4) skips the ~36 s swift:6.1 container start.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
+    container: swift:6.1
     steps:
       - uses: actions/checkout@v4
-      - run: swift --version
       # Dependencies (swift-crypto/BoringSSL) are ~95% of the compile; SwiftPM rebuilds only what changed.
       - id: spm-linux
         uses: actions/cache/restore@v4
         with:
           path: Packages/AudibleCore/.build
-          key: spm-linux-ubuntu24.04-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
-          restore-keys: spm-linux-ubuntu24.04-
+          key: spm-linux-swift6.1-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
+          restore-keys: spm-linux-swift6.1-
       # No --disable-index-store here: on Linux, swift test finds tests through the index store, and a cached
       # .build without units for a new test file fails with "Failed opening .../index/store/v5/units/...".
       - run: swift test --package-path Packages/AudibleCore
