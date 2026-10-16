@@ -17,18 +17,30 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      deps: ${{ steps.diff.outputs.deps }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: diff
         run: |
-          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then echo code=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          # On main only macos-build has to run: its DerivedData key is the commit. The test jobs' caches are keyed
+          # by Package.resolved, so they run there only when a dependency or a cache path (ci.yml) changed.
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo code=true
+            if git diff --name-only HEAD~1 HEAD | grep -qE '(^|/)Package\.(swift|resolved)$|^\.github/workflows/ci\.yml$' ||
+              git diff HEAD~1 HEAD -- project.yml | grep -qE '^[-+] *(url|exactVersion|from|branch|revision):'; then
+              echo deps=true
+            else
+              echo deps=false
+            fi
+            exit 0
+          fi >> "$GITHUB_OUTPUT"
           files=$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD")
           if grep -qvE '\.md$|^docs/' <<< "$files"; then echo code=true; else echo code=false; fi >> "$GITHUB_OUTPUT"
   core-linux:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true')
     runs-on: ubuntu-latest
     container: swift:6.1
     steps:
@@ -51,21 +63,30 @@ jobs:
   # Tests and the app build run on separate runners in parallel (standard runners are free on public repos).
   macos-test:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true')
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      # Diagnostic: does the runner's cold audio stack stall for about 30 s? Runs alongside the tests, printed below.
+      - run: ( time afconvert -f m4af -d aac /System/Library/Sounds/Ping.aiff "$RUNNER_TEMP/w.m4a" ) > "$RUNNER_TEMP/afconvert.txt" 2>&1 &
+        shell: bash
       - id: spm-macos
         uses: actions/cache/restore@v4
         with:
-          path: Packages/AudibleCore/.build
+          path: |
+            Packages/AudibleCore/.build
+            ~/Library/Caches/org.swift.swiftpm/manifests
           key: spm-macos-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
           restore-keys: spm-macos-
       - run: swift test --package-path Packages/AudibleCore --disable-index-store
+      - if: always()
+        run: cat "$RUNNER_TEMP/afconvert.txt"
       - if: github.event_name != 'pull_request' && steps.spm-macos.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: Packages/AudibleCore/.build
+          path: |
+            Packages/AudibleCore/.build
+            ~/Library/Caches/org.swift.swiftpm/manifests
           key: ${{ steps.spm-macos.outputs.cache-primary-key }}
   macos-build:
     needs: changes
@@ -82,19 +103,10 @@ jobs:
             build/ffmpeg-8.0
             build/aria2-1.37.0
           key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
-      # Package checkouts and the Sparkle binary, otherwise cloned and downloaded on every run. Sparkle is pinned
-      # in project.yml, so the key holds its version instead of a hash of the whole file.
-      - id: sparkle
-        run: |
-          echo "version=$(grep -A3 '^  Sparkle:' project.yml | sed -n 's/.*exactVersion: *"\(.*\)"/\1/p')" >> "$GITHUB_OUTPUT"
-      - id: spm-xcode
-        uses: actions/cache/restore@v4
-        with:
-          path: build/SourcePackages
-          key: spm-xcode-sparkle${{ steps.sparkle.outputs.version }}-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
-          restore-keys: spm-xcode-
-      # Products, module caches and object files of the last main build. Package sources keep their cached
-      # mtimes, so their objects (BoringSSL, most of the C compile) are reused; the checkout's files rebuild.
+      # Products, module caches and object files of the last main build, plus package checkouts and the Sparkle
+      # binary (build/SourcePackages) and the SwiftPM manifest cache, in one archive. Package sources keep their
+      # cached mtimes, so their objects (BoringSSL, most of the C compile) are reused; the checkout's files
+      # rebuild. release.yml restores this same path list.
       - id: dd
         uses: actions/cache/restore@v4
         with:
@@ -102,6 +114,8 @@ jobs:
             build/Build
             build/ModuleCache.noindex
             build/SDKExplicitPrecompiledModules
+            build/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm/manifests
           key: dd-macos-${{ github.sha }}
           restore-keys: dd-macos-
       - name: Install XcodeGen
@@ -111,34 +125,42 @@ jobs:
           unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
       - run: xcodegen generate
+      # Its own step so its time shows; the build then uses the resolved versions without fetching again.
+      - run: xcodebuild -resolvePackageDependencies -scheme LecternAudio -derivedDataPath build
+      # The first lines show when the build really starts, the last ones the timing summary; the full log stays in
+      # $RUNNER_TEMP for the rest of the job.
       - run: |
-          xcodebuild -scheme LecternAudio -destination platform=macOS -derivedDataPath build -showBuildTimingSummary build \
-            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO | tail -80
+          xcodebuild -scheme LecternAudio -destination 'platform=macOS,arch=arm64' -derivedDataPath build \
+            -disableAutomaticPackageResolution -showBuildTimingSummary build CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO \
+            | tee "$RUNNER_TEMP/xcodebuild.log" | awk 'NR <= 20' || status=$?
+          echo ...
+          tail -80 "$RUNNER_TEMP/xcodebuild.log"
+          exit "${status:-0}"
         shell: bash -o pipefail {0}
       # The snapshot tests can't run here and their host never takes the real launch path, which crashed in #63
-      # and #64. Launch the app with the fixture library (it is also a valid synced list) in list and grid mode,
-      # 3 times each because a timing crash can pass once. LECTERN_SNAPSHOT writes the PNG and quits.
+      # and #64. Launch the app with the fixture library (it is also a valid synced list) once in list and once in
+      # grid mode. LECTERN_SNAPSHOT writes the PNG and quits. Only on PRs: automerge merges the commit the PR run
+      # launched, and main runs exist to save caches.
       - name: Launch smoke test
+        if: github.event_name == 'pull_request'
         run: |
           mkdir -p "$RUNNER_TEMP/lib" "$RUNNER_TEMP/shots"
           cp Packages/AudibleCore/Tests/AudibleCoreTests/Fixtures/books.json "$RUNNER_TEMP/lib/"
           app="build/Build/Products/Debug/Lectern Audio.app/Contents/MacOS/Lectern Audio"
           for mode in NO YES; do
-            for i in 1 2 3; do
-              shot="$RUNNER_TEMP/shots/shot-viewMode$mode-$i.png"
-              start=$SECONDS
-              status=0
-              # perl alarm is the timeout (no coreutils on the runner): SIGALRM, exit 142, after 60 s.
-              LECTERN_LIBRARY="$RUNNER_TEMP/lib" LECTERN_SYNCED_LIBRARY="$RUNNER_TEMP/lib/books.json" LECTERN_SNAPSHOT="$shot" \
-                perl -e 'alarm shift; exec @ARGV or die' 60 "$app" -viewMode $mode -SUEnableAutomaticChecks NO || status=$?
-              echo "viewMode $mode run $i: exit $status in $((SECONDS - start)) s"
-              if [ "$status" -ne 0 ] || [ ! -s "$shot" ]; then
-                echo "::error::Launch failed (viewMode $mode run $i, exit $status; 142 is the timeout, 134 an abort)"
-                exit 1
-              fi
-            done
+            shot="$RUNNER_TEMP/shots/shot-viewMode$mode.png"
+            start=$SECONDS
+            status=0
+            # perl alarm is the timeout (no coreutils on the runner): SIGALRM, exit 142, after 60 s.
+            LECTERN_LIBRARY="$RUNNER_TEMP/lib" LECTERN_SYNCED_LIBRARY="$RUNNER_TEMP/lib/books.json" LECTERN_SNAPSHOT="$shot" \
+              perl -e 'alarm shift; exec @ARGV or die' 60 "$app" -viewMode $mode -SUEnableAutomaticChecks NO || status=$?
+            echo "viewMode $mode: exit $status in $((SECONDS - start)) s"
+            if [ "$status" -ne 0 ] || [ ! -s "$shot" ]; then
+              echo "::error::Launch failed (viewMode $mode, exit $status; 142 is the timeout, 134 an abort)"
+              exit 1
+            fi
           done
-      - if: always()
+      - if: always() && github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: launch-snapshots
@@ -153,11 +175,6 @@ jobs:
             build/ffmpeg-8.0
             build/aria2-1.37.0
           key: ${{ steps.helpers.outputs.cache-primary-key }}
-      - if: github.event_name != 'pull_request' && steps.spm-xcode.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: build/SourcePackages
-          key: ${{ steps.spm-xcode.outputs.cache-primary-key }}
       - if: github.event_name != 'pull_request'
         uses: actions/cache/save@v4
         with:
@@ -165,4 +182,6 @@ jobs:
             build/Build
             build/ModuleCache.noindex
             build/SDKExplicitPrecompiledModules
+            build/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm/manifests
           key: ${{ steps.dd.outputs.cache-primary-key }}

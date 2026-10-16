@@ -31,14 +31,19 @@ jobs:
             build/ffmpeg-8.0
             build/aria2-1.37.0
           key: helpers-macOS-${{ hashFiles('scripts/build-ffmpeg.sh', 'scripts/build-aria2.sh') }}
-      - id: sparkle
-        run: |
-          echo "version=$(grep -A3 '^  Sparkle:' project.yml | sed -n 's/.*exactVersion: *"\(.*\)"/\1/p')" >> "$GITHUB_OUTPUT"
+      # ci.yml's DerivedData cache, for its package checkouts and the Sparkle binary (scripts/release.sh signs
+      # with its bin/). The path list must match ci.yml's exactly or nothing is found. The tag's commit has
+      # usually been built on main; otherwise the newest main build is used.
       - uses: actions/cache/restore@v4
         with:
-          path: build/SourcePackages
-          key: spm-xcode-sparkle${{ steps.sparkle.outputs.version }}-${{ hashFiles('Packages/AudibleCore/Package.resolved') }}
-          restore-keys: spm-xcode-
+          path: |
+            build/Build
+            build/ModuleCache.noindex
+            build/SDKExplicitPrecompiledModules
+            build/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm/manifests
+          key: dd-macos-${{ github.sha }}
+          restore-keys: dd-macos-
       - name: Install XcodeGen
         run: |
           curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
