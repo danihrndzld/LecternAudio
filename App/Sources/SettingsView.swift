@@ -13,6 +13,7 @@ enum Prefs {
     static let autoSync = "autoSync"
     static let autoSyncHours = "autoSyncHours"
     static let showProgress = "showProgress"
+    static let showGenres = "showGenres"
     static let autoConvert = "autoConvert"
     /// Moves the AAX file (downloaded by OpenAudible) to the Trash after a verified conversion, so it defaults off.
     static let deleteAAXAfterConversion = "deleteAAXAfterConversion"

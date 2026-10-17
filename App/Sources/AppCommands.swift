@@ -198,6 +198,7 @@ private struct ViewCommands: Commands {
     let library: LibraryModel
     @AppStorage(Prefs.tableFontSize) private var fontSize = TableFontSize.medium
     @AppStorage("viewMode") private var gridMode = false
+    @AppStorage(Prefs.showGenres) private var showGenres = true
 
     var body: some Commands {
         CommandGroup(before: .toolbar) {
@@ -217,11 +218,15 @@ private struct ViewCommands: Commands {
                 ForEach([LibraryFilter.all, .reading, .finished, .downloaded, .notDownloaded, .notConverted, .unavailable, .pdfs], id: \.self) {
                     Text($0.title).tag($0)
                 }
-                if !library.genres.isEmpty {
+                if showGenres && !library.genres.isEmpty {
                     Divider()
                     ForEach(library.genres, id: \.0) { genre, _ in Text(genre).tag(LibraryFilter.genre(genre)) }
                 }
             }
+            Toggle("Show Genres", isOn: Binding(get: { showGenres }, set: {
+                showGenres = $0
+                if !$0, case .genre = library.filter { library.filter = .all }
+            }))
             Divider()
             Button("Audiobooks") { library.filter = .all }
                 .keyboardShortcut("1")

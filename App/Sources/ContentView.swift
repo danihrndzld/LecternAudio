@@ -149,6 +149,7 @@ private struct LibraryTitle: ViewModifier {
 
 private struct Sidebar: View {
     @Environment(LibraryModel.self) private var model
+    @AppStorage(Prefs.showGenres) private var showGenres = true
 
     var body: some View {
         let _ = BodyCount.tick("Sidebar")
@@ -166,9 +167,11 @@ private struct Sidebar: View {
                 row(.unavailable, "nosign")
                 row(.pdfs, "doc.richtext")
             }
-            Section("Genres") {
-                ForEach(model.genres, id: \.0) { genre, n in
-                    Label(genre, systemImage: "tag").badge(n).tag(LibraryFilter.genre(genre))
+            if showGenres {
+                Section("Genres") {
+                    ForEach(model.genres, id: \.0) { genre, n in
+                        Label(genre, systemImage: "tag").badge(n).tag(LibraryFilter.genre(genre))
+                    }
                 }
             }
         }
