@@ -72,6 +72,9 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
             }
             ToolbarItem {
+                RandomBookButton(model: model)
+            }
+            ToolbarItem {
                 Button("Sync with Audible", systemImage: "arrow.triangle.2.circlepath") {
                     if let a = session.account { model.sync(a) }
                 }
@@ -215,6 +218,17 @@ private struct Onboarding: View {
     }
 }
 
+
+/// Leaf view so reading the visible count stays out of `ContentView`'s body (performance rules in CLAUDE.md).
+private struct RandomBookButton: View {
+    let model: LibraryModel
+
+    var body: some View {
+        Button("Random Book", systemImage: "shuffle") { model.selectRandomBook() }
+            .help("Select a random book (⌥⌘R)")
+            .disabled(model.visibleBooks.isEmpty)
+    }
+}
 
 /// Toolbar activity button for the export queue. A leaf view so the counts it reads keep their
 /// observation out of `ContentView`'s body (performance rules in CLAUDE.md).
