@@ -300,6 +300,12 @@ final class LibraryModel {
     func artURL(for book: Book) -> URL? { library?.artURL(for: book) ?? book.imageURL }
 
     var visibleBooks: [Book] { index.visible }
+
+    /// Selects a random book from the visible list (current filter and search); the table and grid scroll to it.
+    func selectRandomBook() {
+        var rng = SystemRandomNumberGenerator()
+        if let id = RandomBook.pick(from: index.visible.map(\.id), avoiding: selection, using: &rng) { selection = [id] }
+    }
     var genres: [(name: String, count: Int)] { index.genres }
 
     var selectedBook: Book? {

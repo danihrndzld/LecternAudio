@@ -27,6 +27,7 @@ struct LibraryGrid: View {
 
     var body: some View {
         let _ = BodyCount.tick("LibraryGrid")
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20)], spacing: 24) {
                 ForEach(model.visibleBooks) { b in
@@ -45,6 +46,11 @@ struct LibraryGrid: View {
                 }
             }
             .padding(24)
+        }
+        // Minimal scroll, so a click on a visible cell doesn't move the grid; a random pick off screen scrolls to it.
+        .onChange(of: model.selection) { _, new in
+            if new.count == 1, let id = new.first { proxy.scrollTo(id) }
+        }
         }
     }
 }

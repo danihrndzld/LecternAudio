@@ -234,6 +234,9 @@ private struct ViewCommands: Commands {
             Button("Podcasts") {}
                 .keyboardShortcut("2")
                 .disabled(true)
+            Button("Random Book") { library.selectRandomBook() }
+                .keyboardShortcut("r", modifiers: [.command, .option])
+                .disabled(library.visibleBooks.isEmpty)
             Divider()
             Button("Increase Font Size") { step(1) }
                 .keyboardShortcut("=")
